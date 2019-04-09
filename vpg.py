@@ -1,6 +1,6 @@
 import gym
 import tensorflow as tf
-
+import numpy as np
 
 def explore(policy, env, steps, num_episodes):
     trajectories = []
@@ -37,17 +37,18 @@ def compute_state_reward(state, action):
     #calculate reward
     return reward
 
-def update_policy(policy, grad):
+def update_policy(policy, grad, learning_rate):
     #tensorflow thing to take gradient step
 
     return policy
 
-def init_policy(seed, num_actions = 2):
-    policy = tf.keras.models.Sequential()
-    width = 32
-    policy.add(tf.keras.layers.Dense(width, activation = tf.nn.relu))  
-    policy.add(tf.keras.layers.Dense(num_actions, activation = tf.nn.softmax))
-    
+def init_policy(seed, action_dim, obs_dim):
+    hidden_units = 10
+    observation = tf.placeholder(tf.float21, [None, obs_dim])
+    W1 = tf.Variable(tf.zeros([obs_dim, hidden_units]))
+    W2 = tf.Variable(tf.zeros([hidden_units, action_dim]))
+    b1 = tf.Variable(tf.zeros([hidden_units]))
+    b2 = tf.Variable(tf.zeros([action_dim]))
     return policy
 
 def cost_function(policy):
@@ -56,13 +57,15 @@ def cost_function(policy):
     return cost
 
 
-def run(epochs = 5, seed = 1, steps = 20, num_episodes = 100, environment = 'CartPole-v0'):
+def run(epochs = 5, learning_rate = .01, seed = 1, steps = 20, num_episodes = 100, environment = 'CartPole-v0'):
     env = gym.make(environment)
-    policy = init_policy(seed, num_actions)
+    action_dim = env.action_space.n
+    obs_dim = env.observation_space.n
+    policy = init_policy(seed, action_dim, obs_dim)
     for i in range(epochs):
         trajectories, rewards = explore(policy, env, steps, num_episodes)
-        grad   = compute_grad(trajectories, rewards, policy)
-        policy = update_policy(policy, grad)
+        grad = compute_grad(trajectories, rewards, policy)
+        policy = update_policy(policy, grad, learning_rate)
     
     print("Done!")
     
