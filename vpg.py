@@ -28,8 +28,9 @@ def compute_grad(trajectories, rewards, policy):
     return gradient
     
 def get_action(policy, observation):
-    action = 0
-    # feedforward through network
+	with tf.Session() as sess:
+    	sess.run(tf.global_variables_initializer())
+		
     
     return action
 
@@ -42,14 +43,15 @@ def update_policy(policy, grad, learning_rate):
 
     return policy
 
-def init_policy(seed, action_dim, obs_dim):
-    hidden_units = 10
-    observation = tf.placeholder(tf.float21, [None, obs_dim])
+def mlp(observation, seed, dims):
+    obs_dim, hidden_units, action_dim = dims
     W1 = tf.Variable(tf.zeros([obs_dim, hidden_units]))
     W2 = tf.Variable(tf.zeros([hidden_units, action_dim]))
     b1 = tf.Variable(tf.zeros([hidden_units]))
     b2 = tf.Variable(tf.zeros([action_dim]))
-    return policy
+    layer_1 = tf.nn.relu(tf.add(tf.matmul(observation, W1), b1))
+    layer_out = tf.nn.softmax(tf.add(tf.matmul(layer_1, W2)))
+    return layer_out
 
 def cost_function(policy):
     cost = 0
@@ -61,7 +63,10 @@ def run(epochs = 5, learning_rate = .01, seed = 1, steps = 20, num_episodes = 10
     env = gym.make(environment)
     action_dim = env.action_space.n
     obs_dim = env.observation_space.n
-    policy = init_policy(seed, action_dim, obs_dim)
+    hidden_units = 10
+    dims = (env.observation_space.n, hidden_units, env.action_space.n)
+    observation = tf.placeholder(tf.float32, [1, dims])
+    policy = mlp(observation, seed, action_dim, obs_dim, hidden_units)
     for i in range(epochs):
         trajectories, rewards = explore(policy, env, steps, num_episodes)
         grad = compute_grad(trajectories, rewards, policy)
