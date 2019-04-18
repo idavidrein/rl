@@ -65,8 +65,10 @@ def run(epochs = 5, learning_rate = .01, seed = 1, steps = 20, num_episodes = 10
     obs_dim = env.observation_space.n
     hidden_units = 10
     dims = (env.observation_space.n, hidden_units, env.action_space.n)
+
     observation = tf.placeholder(tf.float32, [1, dims])
     policy = mlp(observation, seed, action_dim, obs_dim, hidden_units)
+
     for i in range(epochs):
         trajectories, rewards = explore(policy, env, steps, num_episodes)
         grad = compute_grad(trajectories, rewards, policy)
