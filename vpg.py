@@ -26,6 +26,10 @@ def rtg(R, t):  #rewards to go
     SamsAwesomeValue = np.sum(R[t:])
     return(SamsAwesomeValue)
 
+def grad_log_policy(policy, action, obs, sess):
+    #need to take gradient[log(policy[action | obs])] 
+    return(0)
+
 
 def compute_grad(policy, rewards, trajectories, sess):
     grad_sum = 0
@@ -34,10 +38,9 @@ def compute_grad(policy, rewards, trajectories, sess):
         R    = rewards[i]
         Traj = trajectories[i]
         for t in range(len(Traj)):
-            obs    = Traj[0]
-            action = Traj[1]
-            grad_sum += grad_log_policy(policy, obs, action) * rtg(R, t)
-
+            obs    = Traj[t][0]
+            action = Traj[t][1]
+            grad_sum += grad_log_policy(policy, action, obs, sess) * rtg(R, t)
 
     gradient = grad_sum/len(rewards)
     return gradient
