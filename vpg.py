@@ -23,17 +23,19 @@ def explore(policy, env, steps, num_episodes, sess):
     return trajectories, rewards
 
 def rtg(R, t):  #rewards to go
-    SamsAwesomeValue = np.sum(R[t:])
+    d = 1.0                      # a discount factor 
+    R2Go = np.copy(np.array(R[t:])) # Copy the Rewards
+    for i in range(len(R2Go)):  # 
+        R2Go[i] *= d**i
+    SamsAwesomeValue = np.sum(R2Go)
     return(SamsAwesomeValue)
 
 def grad_log_policy(policy, action, obs, sess):
     #need to take gradient[log(policy[action | obs])] 
     return(0)
 
-
 def compute_grad(policy, rewards, trajectories, sess):
     grad_sum = 0
-
     for i in range(len(trajectories)):  
         R    = rewards[i]
         Traj = trajectories[i]
@@ -41,8 +43,8 @@ def compute_grad(policy, rewards, trajectories, sess):
             obs    = Traj[t][0]
             action = Traj[t][1]
             grad_sum += grad_log_policy(policy, action, obs, sess) * rtg(R, t)
-
-    gradient = grad_sum/len(rewards)
+    gradient = grad_sum/len(trajectories)
+    # I'm guessing this gradient needs to be a tuple of size four for W1, W2, b1, b2
     return gradient
 
 def mlp(observation, seed, dims):
