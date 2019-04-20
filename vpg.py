@@ -2,7 +2,7 @@ import gym
 import tensorflow as tf
 import numpy as np
 
-def explore(policy, env, steps, num_episodes, sess):
+def explore(layer_out, env, steps, num_episodes, sess):
     trajectories = []
     rewards = []
     for i in range(num_episodes):
@@ -10,7 +10,7 @@ def explore(policy, env, steps, num_episodes, sess):
         trajectory = []
         reward_i = []
         for i in range(steps):
-            action = sess.run([policy], observation)
+            action = sess.run([layer_out], observation)
             trajectory.append((observation, action))
             observation, reward, done, info = env.step(action)
             reward_i.append(reward)
