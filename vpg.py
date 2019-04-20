@@ -26,15 +26,16 @@ def rtg(R, t):  #rewards to go
     SamsAwesomeValue = np.sum(R[t:])
     return(SamsAwesomeValue)
 
-    
 
 def compute_grad(policy, rewards, trajectories, sess):
     grad_sum = 0
 
+    for i in range(len(trajectories)):  
+        R    = rewards[i]
+        Traj = trajectories[i]
 
-    for R in rewards:  
-        for t in range(len(R)):
-            grad_sum +=  log_grad_policy(policy, trajectories) * rtg(R, t)
+        for t in range(len(Traj)):
+            grad_sum += grad_log_policy(policy, Traj) * rtg(R, t)
 
 
     gradient = grad_sum/len(rewards)
