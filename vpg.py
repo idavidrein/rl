@@ -33,10 +33,11 @@ def mlp(observation, seed, dims):
     W2 = tf.Variable(tf.zeros([hidden_units, action_dim]))
     b1 = tf.Variable(tf.zeros([hidden_units]))
     b2 = tf.Variable(tf.zeros([action_dim]))
+    params = (W1, W2, b1, b2)
     layer_1 = tf.nn.relu(tf.add(tf.matmul(observation, W1), b1))
     layer_out = tf.nn.softmax(tf.add(tf.matmul(layer_1, W2)))
     log_out = tf.math.log(layer_out)
-    return layer_out, log_out
+    return layer_out, log_out, params
 
 def run(epochs = 5, learning_rate = .01, seed = 1, steps = 20, num_episodes = 100, environment = 'CartPole-v0'):
     env = gym.make(environment)
@@ -46,7 +47,7 @@ def run(epochs = 5, learning_rate = .01, seed = 1, steps = 20, num_episodes = 10
     dims = (env.observation_space.n, hidden_units, env.action_space.n)
 
     observation = tf.placeholder(tf.float32, [1, dims])
-    policy, log_policy, tape = mlp(observation, seed, (obs_dim, hidden_units, action_dim))
+    policy, log_policy, params = mlp(observation, seed, (obs_dim, hidden_units, action_dim))
 
     with tf.Session() as sess:
 	    for i in range(epochs):
