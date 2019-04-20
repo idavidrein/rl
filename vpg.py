@@ -30,34 +30,56 @@ def rtg(R, t):  #Rewards to go
     SamsAwesomeValue = np.sum(R2Go)
     return(SamsAwesomeValue)
 
-def grad_log_policy(policy, action, obs, sess):
-    #tf.gradients(????)
-    return(0)
-
-def compute_grad(policy, rewards, trajectories, sess):
-    grad_sum = 0
+def grad_log_policy(log_policy, params, action, obs, sess):
+    W1, W2, b1, b2 = params
+    with tf.GradientTape(persistant = True) as tape:
+      tape.watch(params)
+      layer_out, log_out = mlp(obs, seed, params)
+    W1_grad = tape.gradient(log_out, W1)
+    W2_grad = tape.gradient(log_out, W2)
+    b1_grad = tape.gradient(log_out, b1)
+    b2_grad = tape.gradient(log_out, b2)
+    return (W1_grad, W2_grad, b1_grad, b2_grad)
+  
+  
+def compute_grad(log_policy, params, rewards, trajectories, dims, sess):
+    obs_dim, hidden_units, action_dim = dims
+    W1_grad_sum = tf.Variable(tf.zeros([obs_dim, hidden_units]))
+    W2_grad_sum = tf.Variable(tf.zeros([hidden_units, action_dim]))
+    b1_grad_sum = tf.Variable(tf.zeros([hidden_units]))
+    b2_grad_sum = tf.Variable(tf.zeros([action_dim]))
+    
+    N = len(trajectories)
+    
     for i in range(len(trajectories)):  
         R    = rewards[i]
         Traj = trajectories[i]
         for t in range(len(Traj)):
             obs    = Traj[t][0]
             action = Traj[t][1]
-            grad_sum += grad_log_policy(policy, action, obs, sess) * rtg(R, t)
-    gradient = grad_sum/len(trajectories)
-    # I'm guessing this gradient needs to be a tuple of size four for W1, W2, b1, b2
-    return gradient
+            (W1_grad, W2_grad, b1_grad, b2_grad) = grad_log_policy(log_policy, params, action, obs, sess) * rtg(R, t)
+            W1_grad_sum = tf.add(W1_grad, W1_grad_sum)
+            W2_grad_sum = tf.add(W2_grad, W2_grad_sum)
+            b1_grad_sum = tf.add(b1_grad, b1_grad_sum)
+            b2_grad_sum = tf.add(b2_grad, b2_grad_sum)
+  
+    return ( W1_grad_sum/N , W2_grad_sum/N , b1_grad_sum/N , b2_grad_sum/N ) 
 
-def mlp(observation, seed, dims):
+def init_mlp(seed, dims):
     obs_dim, hidden_units, action_dim = dims
     W1 = tf.Variable(tf.zeros([obs_dim, hidden_units]))
     W2 = tf.Variable(tf.zeros([hidden_units, action_dim]))
     b1 = tf.Variable(tf.zeros([hidden_units]))
     b2 = tf.Variable(tf.zeros([action_dim]))
     params   = (W1, W2, b1, b2)
+    return params
+  
+def mlp(observation, seed, params):
+    W1, W2, b1, b2 = params
     layer_1  = tf.nn.relu(tf.add(tf.matmul(observation, W1), b1))
     layer_out = tf.nn.softmax(tf.add(tf.matmul(layer_1, W2), b2)) #Minor Change: Sam added the b2 here
     log_out   = tf.math.log(layer_out)
-    return layer_out, log_out, params
+    return layer_out, log_out
 
 def run(epochs = 5, learning_rate = .01, seed = 1, steps = 20, num_episodes = 100, environment = 'CartPole-v0'):
     env          = gym.make(environment)
@@ -67,33 +89,34 @@ def run(epochs = 5, learning_rate = .01, seed = 1, steps = 20, num_episodes = 10
     dims = (obs_dim, hidden_units, action_dim) #Minor Change: Sam changed env.observation_space.n to obs_dim, etc. 
 
     observation = tf.placeholder(tf.float32, [1, dims])
-    policy, log_policy, params = mlp(observation, seed, (obs_dim, hidden_units, action_dim))
+    params = init_mlp(seed, dims)
+    policy, log_policy = mlp(observation, seed, params)
 
     with tf.Session() as sess:
-	    for i in range(epochs):
-	        trajectories, rewards = explore(policy, env, steps, num_episodes, sess)
-	        grad   = compute_grad(policy, rewards, trajectories, sess)
-	        policy = tf.add(policy, learning_rate * grad) #Don't we need to like update the params 
-                                                          # and then load them into the policy?
+        for i in range(epochs):
+            trajectories, rewards = explore(policy, env, steps, num_episodes, sess)
+            
+            W1_grad, W2_grad, b1_grad, b2_grad  = compute_grad(log_policy, params, rewards, trajectories, dims, sess)
+            W1_new = W1.assign(tf.add(W1, learning_rate * W1_grad))
+            W2_new = W2.assign(tf.add(W2, learning_rate * W2_grad))
+            b1_new = b1.assign(tf.add(b1, learning_rate * b1_grad))
+            b2_new = b2.assign(tf.add(b2, learning_rate * b2_grad))
+    
     
     print("Done!")
     
     env.close()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
