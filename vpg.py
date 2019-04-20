@@ -22,8 +22,21 @@ def explore(policy, env, steps, num_episodes, sess):
         
     return trajectories, rewards
 
-def compute_grad(policy, rewards, trajectories, sess):
+def rtg(R, t):  #rewards to go
+    SamsAwesomeValue = np.sum(R[t:])
+    return(SamsAwesomeValue)
+
     
+
+def compute_grad(policy, rewards, trajectories, sess):
+    grad_sum = 0
+
+
+    for R in rewards:  
+        for t in range(len(R)):
+            grad_sum +=  log_grad_policy(policy, trajectories) * rtg(R, t)
+
+
     gradient = grad_sum/len(rewards)
     return gradient
 
