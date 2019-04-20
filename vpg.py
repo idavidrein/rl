@@ -22,16 +22,16 @@ def explore(policy, env, steps, num_episodes, sess):
         
     return trajectories, rewards
 
-def rtg(R, t):  #rewards to go
-    d = 1.0                      # a discount factor 
-    R2Go = np.copy(np.array(R[t:])) # Copy the Rewards
-    for i in range(len(R2Go)):  # 
+def rtg(R, t):  #Rewards to go
+    d = 1.0                         # a discount factor 
+    R2Go = np.copy(np.array(R[t:]))
+    for i in range(len(R2Go)):
         R2Go[i] *= d**i
     SamsAwesomeValue = np.sum(R2Go)
     return(SamsAwesomeValue)
 
 def grad_log_policy(policy, action, obs, sess):
-    #need to take gradient[log(policy[action | obs])] 
+    #tf.gradients(????)
     return(0)
 
 def compute_grad(policy, rewards, trajectories, sess):
