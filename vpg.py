@@ -33,9 +33,10 @@ def compute_grad(policy, rewards, trajectories, sess):
     for i in range(len(trajectories)):  
         R    = rewards[i]
         Traj = trajectories[i]
-
         for t in range(len(Traj)):
-            grad_sum += grad_log_policy(policy, Traj) * rtg(R, t)
+            obs    = Traj[0]
+            action = Traj[1]
+            grad_sum += grad_log_policy(policy, obs, action) * rtg(R, t)
 
 
     gradient = grad_sum/len(rewards)
