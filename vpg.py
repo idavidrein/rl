@@ -5,14 +5,13 @@ import numpy as np
 def explore(layer_out, env, steps, num_episodes, sess):
     trajectories = []
     rewards = []
-    print(layer_out)
-    print(num_episodes)
     for i in range(num_episodes):
         obs = env.reset()
         trajectory = []
         reward_i = []
         for i in range(steps):
-            action = sess.run(layer_out, feed_dict = {'obs': obs})
+            action = sess.run(layer_out, feed_dict = {observation: obs})
+            print(action)
             trajectory.append((obs, action))
             obs, reward, done, info = env.step(action)
             reward_i.append(reward)
@@ -78,9 +77,9 @@ def init_mlp(dims):
     params   = (W1, W2, b1, b2)
     return params
   
-def mlp(observation, params):
+def mlp(func_obs, params):
     W1, W2, b1, b2 = params
-    layer_1  = tf.nn.relu(tf.add(tf.matmul(observation, W1), b1))
+    layer_1  = tf.nn.relu(tf.add(tf.matmul(func_obs, W1), b1))
     layer_out = tf.nn.softmax(tf.add(tf.matmul(layer_1, W2), b2)) #Minor Change: Sam added the b2 here
     return layer_out
 
