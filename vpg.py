@@ -6,14 +6,15 @@ def explore(layer_out, env, steps, num_episodes, sess):
     trajectories = []
     rewards = []
     for i in range(num_episodes):
-        obs = env.reset()
+        obs = np.expand_dims(env.reset(), axis = 0)
         trajectory = []
         reward_i = []
         for i in range(steps):
-            action = sess.run(layer_out, feed_dict = {observation: obs})
-            print(action)
+            action_probs = sess.run(layer_out, feed_dict = {'p_obs:0': obs})
+            action = np.argmax(action_probs)
             trajectory.append((obs, action))
             obs, reward, done, info = env.step(action)
+            obs = np.expand_dims(obs, axis = 0)
             reward_i.append(reward)
             if done:
                 print("Episode over after {0} timesteps".format(i+1))
@@ -70,10 +71,10 @@ def compute_grad(params, rewards, trajectories, dims, sess):
 
 def init_mlp(dims):
     obs_dim, hidden_units, action_dim = dims
-    W1 = tf.Variable(tf.zeros([obs_dim, hidden_units]))
-    W2 = tf.Variable(tf.zeros([hidden_units, action_dim]))
-    b1 = tf.Variable(tf.zeros([hidden_units]))
-    b2 = tf.Variable(tf.zeros([action_dim]))
+    W1 = tf.Variable(tf.zeros([obs_dim, hidden_units]), name = 'W1')
+    W2 = tf.Variable(tf.zeros([hidden_units, action_dim]), name = 'W2')
+    b1 = tf.Variable(tf.zeros([hidden_units]), name = 'b1')
+    b2 = tf.Variable(tf.zeros([action_dim]), name = 'b2')
     params   = (W1, W2, b1, b2)
     return params
   
@@ -92,7 +93,7 @@ def run(epochs = 5, learning_rate = .01,
     hidden_units = 10
     dims = (obs_dim, hidden_units, action_dim) #Minor Change: Sam changed env.observation_space.n to obs_dim, etc. 
 
-    observation = tf.placeholder(tf.float32, [1, obs_dim], name = 'obs')
+    observation = tf.placeholder(tf.float32, [1, obs_dim], name = 'p_obs')
     params = init_mlp(dims)
     layer_out = mlp(observation, params)
 
