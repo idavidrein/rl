@@ -5,14 +5,16 @@ import numpy as np
 def explore(layer_out, env, steps, num_episodes, sess):
     trajectories = []
     rewards = []
+    print(layer_out)
+    print(num_episodes)
     for i in range(num_episodes):
-        observation = env.reset()
+        obs = env.reset()
         trajectory = []
         reward_i = []
         for i in range(steps):
-            action = sess.run([layer_out], observation)
-            trajectory.append((observation, action))
-            observation, reward, done, info = env.step(action)
+            action = sess.run(layer_out, feed_dict = {'obs': obs})
+            trajectory.append((obs, action))
+            obs, reward, done, info = env.step(action)
             reward_i.append(reward)
             if done:
                 print("Episode over after {0} timesteps".format(i+1))
@@ -45,6 +47,7 @@ def grad_log_policy(params, action, obs, sess):
   
 def compute_grad(params, rewards, trajectories, dims, sess):
     obs_dim, hidden_units, action_dim = dims
+    # to-do: use Xavier (or something else) to initialize instead of zeros
     W1_grad_sum = tf.Variable(tf.zeros([obs_dim, hidden_units]))
     W2_grad_sum = tf.Variable(tf.zeros([hidden_units, action_dim]))
     b1_grad_sum = tf.Variable(tf.zeros([hidden_units]))
@@ -86,15 +89,16 @@ def run(epochs = 5, learning_rate = .01,
 		environment = 'CartPole-v0'):
     env          = gym.make(environment)
     action_dim   = env.action_space.n
-    obs_dim      = env.observation_space.n
+    obs_dim      = len(env.observation_space.high)
     hidden_units = 10
     dims = (obs_dim, hidden_units, action_dim) #Minor Change: Sam changed env.observation_space.n to obs_dim, etc. 
 
-    observation = tf.placeholder(tf.float32, [1, dims])
+    observation = tf.placeholder(tf.float32, [1, obs_dim], name = 'obs')
     params = init_mlp(dims)
     layer_out = mlp(observation, params)
 
     with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
         for i in range(epochs):
             trajectories, rewards = explore(layer_out, env, steps, num_episodes, sess)
 
