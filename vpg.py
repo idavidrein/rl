@@ -1,6 +1,7 @@
 import gym
 import tensorflow as tf
 import numpy as np
+from tqdm import tqdm
 
 def explore(layer_out, env, steps, num_episodes, sess):
     trajectories = []
@@ -34,7 +35,6 @@ def rtg(R, t):  #Rewards to go
     return(SamsAwesomeValue)
 
 def grad_log_policy(params, action, obs, sess):
-    print("grad_log_policy")
     W1, W2, b1, b2 = params
     layer_out = mlp(obs, params)
     log_out = tf.math.log(layer_out)
@@ -55,7 +55,7 @@ def compute_grad(params, rewards, trajectories, dims, sess):
     
     N = len(trajectories)
     
-    for i in range(len(trajectories)):  
+    for i in tqdm(range(len(trajectories))):  
         R    = rewards[i]
         Traj = trajectories[i]
         for t in range(len(Traj)):
@@ -65,12 +65,9 @@ def compute_grad(params, rewards, trajectories, dims, sess):
             W1_grad, W2_grad, b1_grad, b2_grad = grad_log_policy(params, action, obs, sess)
 
             W1_grad_sum = tf.add(tf.multiply( W1_grad, rtg(R,t)), W1_grad_sum )
-            print("\n\n Success!!!")
-            exit()
-
-            W2_grad_sum = tf.add( W2_grad * rtg(R, t) , W2_grad_sum )
-            b1_grad_sum = tf.add( b1_grad * rtg(R, t) , b1_grad_sum )
-            b2_grad_sum = tf.add( b2_grad * rtg(R, t) , b2_grad_sum )
+            W2_grad_sum = tf.add(tf.multiply( W2_grad, rtg(R,t)), W2_grad_sum )
+            b1_grad_sum = tf.add(tf.multiply( b1_grad, rtg(R,t)), b1_grad_sum )
+            b2_grad_sum = tf.add(tf.multiply( b2_grad, rtg(R,t)), b2_grad_sum )
   
     return ( W1_grad_sum/N , W2_grad_sum/N , b1_grad_sum/N , b2_grad_sum/N ) 
 
@@ -91,7 +88,7 @@ def mlp(func_obs, params):
     return layer_out
 
 def run(epochs = 5, learning_rate = .01, 
-		steps = 20, num_episodes = 100, 
+		steps = 20, num_episodes = 10, 
 		environment = 'CartPole-v0'):
     print("running vpg\n")
     print("creating environment\n")
