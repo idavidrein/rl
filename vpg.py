@@ -5,6 +5,7 @@ import numpy as np
 def explore(layer_out, env, steps, num_episodes, sess):
     trajectories = []
     rewards = []
+    print("Exploring\n")
     for i in range(num_episodes):
         obs = np.expand_dims(env.reset(), axis = 0)
         trajectory = []
@@ -25,11 +26,11 @@ def explore(layer_out, env, steps, num_episodes, sess):
     return trajectories, rewards
 
 def rtg(R, t):  #Rewards to go
-    d = 1.0                         # a discount factor 
+    d = 1.0     # a discount factor 
     R2Go = np.copy(np.array(R[t:]))
     for i in range(len(R2Go)):
         R2Go[i] *= d**i
-    SamsAwesomeValue = np.sum(R2Go)
+    SamsAwesomeValue = np.sum(R2Go).astype(np.float64)
     return(SamsAwesomeValue)
 
 def grad_log_policy(params, action, obs, sess):
@@ -47,10 +48,10 @@ def grad_log_policy(params, action, obs, sess):
 def compute_grad(params, rewards, trajectories, dims, sess):
     print("computting gradient")
     obs_dim, hidden_units, action_dim = dims
-    W1_grad_sum = tf.Variable(tf.zeros([obs_dim, hidden_units]))
-    W2_grad_sum = tf.Variable(tf.zeros([hidden_units, action_dim]))
-    b1_grad_sum = tf.Variable(tf.zeros([hidden_units]))
-    b2_grad_sum = tf.Variable(tf.zeros([action_dim]))
+    W1_grad_sum = tf.Variable(tf.zeros([obs_dim, hidden_units], dtype = tf.float64))
+    W2_grad_sum = tf.Variable(tf.zeros([hidden_units, action_dim], dtype = tf.float64))
+    b1_grad_sum = tf.Variable(tf.zeros([hidden_units], dtype = tf.float64))
+    b2_grad_sum = tf.Variable(tf.zeros([action_dim], dtype = tf.float64))
     
     N = len(trajectories)
     
@@ -63,7 +64,10 @@ def compute_grad(params, rewards, trajectories, dims, sess):
             # make rtg a tensor so we can just include it in the computation graph
             W1_grad, W2_grad, b1_grad, b2_grad = grad_log_policy(params, action, obs, sess)
 
-            W1_grad_sum = tf.add( W1_grad * rtg(R, t) , W1_grad_sum )
+            W1_grad_sum = tf.add(tf.multiply( W1_grad, rtg(R,t)), W1_grad_sum )
+            print("\n\n Success!!!")
+            exit()
+
             W2_grad_sum = tf.add( W2_grad * rtg(R, t) , W2_grad_sum )
             b1_grad_sum = tf.add( b1_grad * rtg(R, t) , b1_grad_sum )
             b2_grad_sum = tf.add( b2_grad * rtg(R, t) , b2_grad_sum )
@@ -73,10 +77,10 @@ def compute_grad(params, rewards, trajectories, dims, sess):
 def init_mlp(dims):
     obs_dim, hidden_units, action_dim = dims
     # to-do: use Xavier (or something else) to initialize instead of zeros
-    W1 = tf.Variable(tf.zeros([obs_dim, hidden_units], dtype = tf.float32), name = 'W1')
-    W2 = tf.Variable(tf.zeros([hidden_units, action_dim], dtype = tf.float32), name = 'W2')
-    b1 = tf.Variable(tf.zeros([hidden_units], dtype = tf.float32), name = 'b1')
-    b2 = tf.Variable(tf.zeros([action_dim], dtype = tf.float32), name = 'b2')
+    W1 = tf.Variable(tf.zeros([obs_dim, hidden_units], dtype = tf.float64), name = 'W1')
+    W2 = tf.Variable(tf.zeros([hidden_units, action_dim], dtype = tf.float64), name = 'W2')
+    b1 = tf.Variable(tf.zeros([hidden_units], dtype = tf.float64), name = 'b1')
+    b2 = tf.Variable(tf.zeros([action_dim], dtype = tf.float64), name = 'b2')
     params   = (W1, W2, b1, b2)
     return params
   
@@ -97,7 +101,7 @@ def run(epochs = 5, learning_rate = .01,
     hidden_units = 10
     dims = (obs_dim, hidden_units, action_dim) #Minor Change: Sam changed env.observation_space.n to obs_dim, etc. 
     print("placeholders \n")
-    observation = tf.placeholder(tf.float32, [1, obs_dim], name = 'p_obs')
+    observation = tf.placeholder(tf.float64, [1, obs_dim], name = 'p_obs')
     print("initializing mlp \n")
     params = init_mlp(dims)
     print("creating mlp\n")
