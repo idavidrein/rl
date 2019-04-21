@@ -3,26 +3,28 @@ import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
 
-def explore(layer_out, env, steps, num_episodes, sess):
+def explore(layer_out, env, steps, num_trajectories, sess):
     trajectories = []
     rewards = []
-    print("Exploring\n")
-    for i in range(num_episodes):
+    print("\nExploring...\n")
+    for i in range(num_trajectories):
         obs = np.expand_dims(env.reset(), axis = 0)
         trajectory = []
-        reward_i = []
-        for i in range(steps):
+        reward_j = []
+        i = 0
+        for j in range(steps):
             action_probs = sess.run(layer_out, feed_dict = {'p_obs:0': obs})
             action = np.argmax(action_probs)
             trajectory.append((obs, action))
             obs, reward, done, info = env.step(action)
             obs = np.expand_dims(obs, axis = 0)
-            reward_i.append(reward)
+            reward_j.append(reward)
             if done:
-                print("Episode over after {0} timesteps".format(i+1))
                 break
+            i += 1
+        print("Episode over after {0} timesteps".format(i+1))
         trajectories.append(trajectory)
-        rewards.append(reward_i)
+        rewards.append(reward_j)
         
     return trajectories, rewards
 
@@ -46,7 +48,7 @@ def grad_log_policy(params, action, obs, sess):
   
   
 def compute_grad(params, rewards, trajectories, dims, sess):
-    print("Setting up gradient")
+    print("Setting up gradient...")
     obs_dim, hidden_units, action_dim = dims
     W1_grad_sum = tf.Variable(tf.zeros([obs_dim, hidden_units], dtype = tf.float64))
     W2_grad_sum = tf.Variable(tf.zeros([hidden_units, action_dim], dtype = tf.float64))
@@ -56,7 +58,7 @@ def compute_grad(params, rewards, trajectories, dims, sess):
     
     N = len(trajectories)
     
-    for i in tqdm(range(len(trajectories))):  
+    for i in range(len(trajectories)):  
         R    = rewards[i]
         Traj = trajectories[i]
         for t in range(len(Traj)):
@@ -89,43 +91,39 @@ def mlp(func_obs, params):
     return layer_out
 
 def run(epochs = 5, learning_rate = .01, 
-		steps = 20, num_episodes = 2, 
+		steps = 10, num_trajectories = 2, 
 		environment = 'CartPole-v0'):
-    print("running vpg\n")
-    print("creating environment\n")
+    print("Creating environment...")
     env          = gym.make(environment)
     action_dim   = env.action_space.n
     obs_dim      = len(env.observation_space.high)
     hidden_units = 10
     dims = (obs_dim, hidden_units, action_dim) #Minor Change: Sam changed env.observation_space.n to obs_dim, etc. 
-    print("placeholders \n")
     observation = tf.placeholder(tf.float64, [1, obs_dim], name = 'p_obs')
-    print("initializing mlp \n")
+    print("Creating network...")
     params = init_mlp(dims)
     W1, W2, b1, b2 = params
-    print("creating mlp\n")
     layer_out = mlp(observation, params)
-    print("starting session\n")
+    print("\nStarting session...\n")
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         for i in range(epochs):
-            trajectories, rewards = explore(layer_out, env, steps, num_episodes, sess)
+            trajectories, rewards = explore(layer_out, env, steps, num_trajectories, sess)
 
             W1_grad, W2_grad, b1_grad, b2_grad = compute_grad(params, rewards, trajectories, dims, sess)
-            print(W1_grad) # Tensor("truediv:0", shape=(1, 4, 10), dtype=float64)
-            W1_new = W1.assign(tf.add(W1, learning_rate * W1_grad))
-            W2_new = W2.assign(tf.add(W2, learning_rate * W2_grad))
-            b1_new = b1.assign(tf.add(b1, learning_rate * b1_grad))
-            b2_new = b2.assign(tf.add(b2, learning_rate * b2_grad))
-            params = W1_new, W2_new, b1_new, b2_new
-            params = sess.run(params)
+            W1 = tf.assign(W1, tf.add(W1, learning_rate * W1_grad))
+            W2 = tf.assign(W2, tf.add(W2, learning_rate * W2_grad))
+            b1 = tf.assign(b1, tf.add(b1, learning_rate * b1_grad))
+            b2 = tf.assign(b2, tf.add(b2, learning_rate * b2_grad))
+            params = W1, W2, b1, b2
+            print("Computing gradients...")
+            print(params)
+            _ = sess.run(params)
+            print(params)
             layer_out = mlp(observation, params)
             print(params)
-            break
-            # at this point, the updates haven't been computed yet. 
-            # the way it's currently set up, they'll be computed in line
-            # action_probs = sess.run(layer_out, feed_dict = {'p_obs:0': obs})
-            # and a bunch of stuff (including all of the gradients) will be computed
-    	print("Done!")
-        return(layer_out)
+        print("Done!")
+    return None
     env.close()
+
+run()
