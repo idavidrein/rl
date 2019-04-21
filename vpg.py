@@ -33,6 +33,7 @@ def rtg(R, t):  #Rewards to go
     return(SamsAwesomeValue)
 
 def grad_log_policy(params, action, obs, sess):
+    print("grad_log_policy")
     W1, W2, b1, b2 = params
     layer_out = mlp(obs, params)
     log_out = tf.math.log(layer_out)
@@ -44,6 +45,7 @@ def grad_log_policy(params, action, obs, sess):
   
   
 def compute_grad(params, rewards, trajectories, dims, sess):
+    print("computting gradient")
     obs_dim, hidden_units, action_dim = dims
     W1_grad_sum = tf.Variable(tf.zeros([obs_dim, hidden_units]))
     W2_grad_sum = tf.Variable(tf.zeros([hidden_units, action_dim]))
@@ -71,10 +73,10 @@ def compute_grad(params, rewards, trajectories, dims, sess):
 def init_mlp(dims):
     obs_dim, hidden_units, action_dim = dims
     # to-do: use Xavier (or something else) to initialize instead of zeros
-    W1 = tf.Variable(tf.zeros([obs_dim, hidden_units], dtype = tf.dtypes.float64), name = 'W1')
-    W2 = tf.Variable(tf.zeros([hidden_units, action_dim], dtype = tf.dtypes.float64), name = 'W2')
-    b1 = tf.Variable(tf.zeros([hidden_units], dtype = tf.dtypes.float64), name = 'b1')
-    b2 = tf.Variable(tf.zeros([action_dim], dtype = tf.dtypes.float64), name = 'b2')
+    W1 = tf.Variable(tf.zeros([obs_dim, hidden_units], dtype = tf.float32), name = 'W1')
+    W2 = tf.Variable(tf.zeros([hidden_units, action_dim], dtype = tf.float32), name = 'W2')
+    b1 = tf.Variable(tf.zeros([hidden_units], dtype = tf.float32), name = 'b1')
+    b2 = tf.Variable(tf.zeros([action_dim], dtype = tf.float32), name = 'b2')
     params   = (W1, W2, b1, b2)
     return params
   
@@ -87,16 +89,20 @@ def mlp(func_obs, params):
 def run(epochs = 5, learning_rate = .01, 
 		steps = 20, num_episodes = 100, 
 		environment = 'CartPole-v0'):
+    print("running vpg\n")
+    print("creating environment\n")
     env          = gym.make(environment)
     action_dim   = env.action_space.n
     obs_dim      = len(env.observation_space.high)
     hidden_units = 10
     dims = (obs_dim, hidden_units, action_dim) #Minor Change: Sam changed env.observation_space.n to obs_dim, etc. 
-
-    observation = tf.placeholder(tf.float64, [1, obs_dim], name = 'p_obs')
+    print("placeholders \n")
+    observation = tf.placeholder(tf.float32, [1, obs_dim], name = 'p_obs')
+    print("initializing mlp \n")
     params = init_mlp(dims)
+    print("creating mlp\n")
     layer_out = mlp(observation, params)
-
+    print("starting session\n")
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         for i in range(epochs):
@@ -118,5 +124,6 @@ def run(epochs = 5, learning_rate = .01,
     
     
     print("Done!")
-    
     env.close()
+
+run()
