@@ -1,5 +1,6 @@
 import gym
 import tensorflow as tf
+from tensorflow.contrib.layers import xavier_initializer
 import numpy as np
 from tqdm import tqdm
 
@@ -75,12 +76,11 @@ def compute_grad(params, rewards, trajectories, dims, sess):
 
 def init_mlp(dims):
     obs_dim, hidden_units, action_dim = dims
-    # to-do: use Xavier (or something else) to initialize instead of zeros
-    initializer = tf.contrib.layers.xavier_initializer()
-    W1 = tf.Variable(tf.zeros([obs_dim, hidden_units],    dtype = tf.float64), name = 'W1')
-    W2 = tf.Variable(tf.zeros([hidden_units, action_dim], dtype = tf.float64), name = 'W2')
-    b1 = tf.Variable(tf.zeros([hidden_units],             dtype = tf.float64), name = 'b1')
-    b2 = tf.Variable(tf.zeros([action_dim],               dtype = tf.float64), name = 'b2')
+    initializer = xavier_initializer(dtype = tf.float64)
+    W1 = tf.Variable(initializer([obs_dim, hidden_units]), name = 'W1')
+    W2 = tf.Variable(initializer([hidden_units, action_dim]), name = 'W2')
+    b1 = tf.Variable(initializer([hidden_units]), name = 'b1')
+    b2 = tf.Variable(initializer([action_dim]), name = 'b2')
     params   = (W1, W2, b1, b2)
     return params
   
@@ -90,7 +90,7 @@ def mlp(func_obs, params):
     layer_out = tf.nn.softmax(tf.add(tf.matmul(layer_1, W2), b2)) #Minor Change: Sam added the b2 here
     return layer_out
 
-def run(epochs = 5, learning_rate = .01, 
+def run(epochs = 3, learning_rate = .01, 
 		steps = 10, num_trajectories = 2, 
 		environment = 'CartPole-v0'):
     print("Creating environment...")
@@ -117,11 +117,9 @@ def run(epochs = 5, learning_rate = .01,
             b2 = tf.assign(b2, tf.add(b2, learning_rate * b2_grad))
             params = W1, W2, b1, b2
             print("Computing gradients...")
-            print(params)
-            _ = sess.run(params)
-            print(params)
+            _, W1_grad_val = sess.run([params, W1_grad])
+            print(W1_grad_val)
             layer_out = mlp(observation, params)
-            print(params)
         print("Done!")
     return None
     env.close()
