@@ -38,20 +38,21 @@ def grad_log_policy(params, action, obs, sess):
     W1, W2, b1, b2 = params
     layer_out = mlp(obs, params)
     log_out = tf.math.log(layer_out)
-    W1_grad = tf.gradients(log_out, W1)
-    W2_grad = tf.gradients(log_out, W2)
-    b1_grad = tf.gradients(log_out, b1)
-    b2_grad = tf.gradients(log_out, b2)
+    W1_grad = tf.squeeze(tf.gradients(tf.slice(log_out, [0, action], [-1, 1]), W1))
+    W2_grad = tf.squeeze(tf.gradients(tf.slice(log_out, [0, action], [-1, 1]), W2))
+    b1_grad = tf.squeeze(tf.gradients(tf.slice(log_out, [0, action], [-1, 1]), b1))
+    b2_grad = tf.squeeze(tf.gradients(tf.slice(log_out, [0, action], [-1, 1]), b2))
     return (W1_grad, W2_grad, b1_grad, b2_grad)
   
   
 def compute_grad(params, rewards, trajectories, dims, sess):
-    print("computting gradient")
+    print("Setting up gradient")
     obs_dim, hidden_units, action_dim = dims
     W1_grad_sum = tf.Variable(tf.zeros([obs_dim, hidden_units], dtype = tf.float64))
     W2_grad_sum = tf.Variable(tf.zeros([hidden_units, action_dim], dtype = tf.float64))
     b1_grad_sum = tf.Variable(tf.zeros([hidden_units], dtype = tf.float64))
     b2_grad_sum = tf.Variable(tf.zeros([action_dim], dtype = tf.float64))
+    sess.run(tf.global_variables_initializer())
     
     N = len(trajectories)
     
@@ -61,7 +62,6 @@ def compute_grad(params, rewards, trajectories, dims, sess):
         for t in range(len(Traj)):
             obs    = Traj[t][0]
             action = Traj[t][1]
-            # make rtg a tensor so we can just include it in the computation graph
             W1_grad, W2_grad, b1_grad, b2_grad = grad_log_policy(params, action, obs, sess)
 
             W1_grad_sum = tf.add(tf.multiply( W1_grad, rtg(R,t)), W1_grad_sum )
@@ -74,10 +74,11 @@ def compute_grad(params, rewards, trajectories, dims, sess):
 def init_mlp(dims):
     obs_dim, hidden_units, action_dim = dims
     # to-do: use Xavier (or something else) to initialize instead of zeros
-    W1 = tf.Variable(tf.zeros([obs_dim, hidden_units], dtype = tf.float64), name = 'W1')
+    initializer = tf.contrib.layers.xavier_initializer()
+    W1 = tf.Variable(tf.zeros([obs_dim, hidden_units],    dtype = tf.float64), name = 'W1')
     W2 = tf.Variable(tf.zeros([hidden_units, action_dim], dtype = tf.float64), name = 'W2')
-    b1 = tf.Variable(tf.zeros([hidden_units], dtype = tf.float64), name = 'b1')
-    b2 = tf.Variable(tf.zeros([action_dim], dtype = tf.float64), name = 'b2')
+    b1 = tf.Variable(tf.zeros([hidden_units],             dtype = tf.float64), name = 'b1')
+    b2 = tf.Variable(tf.zeros([action_dim],               dtype = tf.float64), name = 'b2')
     params   = (W1, W2, b1, b2)
     return params
   
@@ -88,7 +89,7 @@ def mlp(func_obs, params):
     return layer_out
 
 def run(epochs = 5, learning_rate = .01, 
-		steps = 20, num_episodes = 10, 
+		steps = 20, num_episodes = 2, 
 		environment = 'CartPole-v0'):
     print("running vpg\n")
     print("creating environment\n")
@@ -101,6 +102,7 @@ def run(epochs = 5, learning_rate = .01,
     observation = tf.placeholder(tf.float64, [1, obs_dim], name = 'p_obs')
     print("initializing mlp \n")
     params = init_mlp(dims)
+    W1, W2, b1, b2 = params
     print("creating mlp\n")
     layer_out = mlp(observation, params)
     print("starting session\n")
@@ -110,21 +112,20 @@ def run(epochs = 5, learning_rate = .01,
             trajectories, rewards = explore(layer_out, env, steps, num_episodes, sess)
 
             W1_grad, W2_grad, b1_grad, b2_grad = compute_grad(params, rewards, trajectories, dims, sess)
-            print(W1_grad, W2_grad)
-            break
+            print(W1_grad) # Tensor("truediv:0", shape=(1, 4, 10), dtype=float64)
             W1_new = W1.assign(tf.add(W1, learning_rate * W1_grad))
             W2_new = W2.assign(tf.add(W2, learning_rate * W2_grad))
             b1_new = b1.assign(tf.add(b1, learning_rate * b1_grad))
             b2_new = b2.assign(tf.add(b2, learning_rate * b2_grad))
             params = W1_new, W2_new, b1_new, b2_new
+            params = sess.run(params)
             layer_out = mlp(observation, params)
+            print(params)
+            break
             # at this point, the updates haven't been computed yet. 
             # the way it's currently set up, they'll be computed in line
             # action_probs = sess.run(layer_out, feed_dict = {'p_obs:0': obs})
             # and a bunch of stuff (including all of the gradients) will be computed
-    
-    
-    print("Done!")
+    	print("Done!")
+        return(layer_out)
     env.close()
-
-run()
