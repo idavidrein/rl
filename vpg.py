@@ -59,11 +59,12 @@ def compute_grad(params, rewards, trajectories, dims, sess):
             obs    = Traj[t][0]
             action = Traj[t][1]
             # make rtg a tensor so we can just include it in the computation graph
-            W1_grad, W2_grad, b1_grad, b2_grad = grad_log_policy(params, action, obs, sess) * rtg(R, t)
-            W1_grad_sum = tf.add(W1_grad, W1_grad_sum)
-            W2_grad_sum = tf.add(W2_grad, W2_grad_sum)
-            b1_grad_sum = tf.add(b1_grad, b1_grad_sum)
-            b2_grad_sum = tf.add(b2_grad, b2_grad_sum)
+            W1_grad, W2_grad, b1_grad, b2_grad = grad_log_policy(params, action, obs, sess)
+
+            W1_grad_sum = tf.add( W1_grad * rtg(R, t) , W1_grad_sum )
+            W2_grad_sum = tf.add( W2_grad * rtg(R, t) , W2_grad_sum )
+            b1_grad_sum = tf.add( b1_grad * rtg(R, t) , b1_grad_sum )
+            b2_grad_sum = tf.add( b2_grad * rtg(R, t) , b2_grad_sum )
   
     return ( W1_grad_sum/N , W2_grad_sum/N , b1_grad_sum/N , b2_grad_sum/N ) 
 
