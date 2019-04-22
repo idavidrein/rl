@@ -118,7 +118,7 @@ def run(epochs = 30, learning_rate = .1,
     action_dim   = env.action_space.n
     obs_dim      = len(env.observation_space.high)
     hidden_units = 10
-    dims = (obs_dim, hidden_units, action_dim) #Minor Change: Sam changed env.observation_space.n to obs_dim, etc. 
+    dims = (obs_dim, hidden_units, action_dim)  
     observation = tf.placeholder(tf.float64, [1, obs_dim], name = 'p_obs')
     print("Creating network...")
     params = init_mlp(dims)
