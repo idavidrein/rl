@@ -24,6 +24,7 @@ def explore(layer_out, env, steps, num_trajectories, sess):
             if done:
                 break
             i += 1
+        print(action_probs)
         # print("Episode over after {0} timesteps".format(i+1))
         trajectories.append(trajectory)
         rewards.append(reward_j)
@@ -68,7 +69,7 @@ def compute_grad(params, rewards, trajectories, dims, sess):
         params, action_place, obs_place, sess
     )
 
-    asdf = tf.py_function(rtg, [R_place, t_place], tf.float64)
+    asdf = tf.py_func(rtg, [R_place, t_place], tf.float64)
 
     W1_grad_sum = tf.add(tf.multiply( W1_grad, asdf), W1_grad_sum )
     W2_grad_sum = tf.add(tf.multiply( W2_grad, asdf), W2_grad_sum )
@@ -110,7 +111,7 @@ def mlp(func_obs, params):
     layer_out = tf.nn.softmax(tf.add(tf.matmul(layer_1, W2), b2)) #Minor Change: Sam added the b2 here
     return layer_out
 
-def run(epochs = 30, learning_rate = .1, 
+def run(epochs = 5, learning_rate = .01, 
 		steps = 40, num_trajectories = 100, 
 		environment = 'CartPole-v0'):
     print("Creating environment...")
@@ -138,7 +139,10 @@ def run(epochs = 30, learning_rate = .1,
             params = W1, W2, b1, b2
             # print("Computing gradients...")
             qwer = sess.run(params)
+            W1_run, W2_run, b1_run, b2_run = qwer
             layer_out = mlp(observation, params)
+            print("Current b2:", b2_run)
+            print("Rewards is broken:", set([set(r)=={1.0} for r in rewards]))
         # writer = tf.summary.FileWriter("./graphs", sess.graph)
         print("\nDone!")
     return None
