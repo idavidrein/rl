@@ -138,7 +138,7 @@ def run(epochs = 5, learning_rate = .01,
             b2 = tf.assign(b2, tf.add(b2, learning_rate * b2_grad))
             params = W1, W2, b1, b2
             # print("Computing gradients...")
-            qwer = sess.run(params)
+            qwer = sess.run(params) 
             W1_run, W2_run, b1_run, b2_run = qwer
             layer_out = mlp(observation, params)
             print("Current b2:", b2_run)
