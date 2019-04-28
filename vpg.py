@@ -3,6 +3,7 @@ import tensorflow as tf
 from tensorflow.contrib.layers import xavier_initializer
 import numpy as np
 from tqdm import tqdm
+import time
 
 def explore(layer_out, env, steps, num_trajectories, sess):
     trajectories = []
@@ -24,7 +25,7 @@ def explore(layer_out, env, steps, num_trajectories, sess):
             if done:
                 break
             i += 1
-        print(action_probs)
+        # print(action_probs)
         # print("Episode over after {0} timesteps".format(i+1))
         trajectories.append(trajectory)
         rewards.append(reward_j)
@@ -36,8 +37,8 @@ def rtg(R, t):  #Rewards to go
     R2Go = np.copy(np.array(R[t:]))
     for i in range(len(R2Go)):
         R2Go[i] *= d**i
-    SamsAwesomeValue = np.sum(R2Go).astype(np.float64)
-    return(SamsAwesomeValue)
+    rewards_to_go = np.sum(R2Go).astype(np.float64)
+    return(rewards_to_go)
 
 def grad_log_policy(params, action_place, obs_place, sess):
     W1, W2, b1, b2 = params
@@ -69,12 +70,18 @@ def compute_grad(params, rewards, trajectories, dims, sess):
         params, action_place, obs_place, sess
     )
 
-    asdf = tf.py_func(rtg, [R_place, t_place], tf.float64)
+    r2go = tf.py_func(rtg, [R_place, t_place], tf.float64)
 
-    W1_grad_sum = tf.add(tf.multiply( W1_grad, asdf), W1_grad_sum )
-    W2_grad_sum = tf.add(tf.multiply( W2_grad, asdf), W2_grad_sum )
-    b1_grad_sum = tf.add(tf.multiply( b1_grad, asdf), b1_grad_sum )
-    b2_grad_sum = tf.add(tf.multiply( b2_grad, asdf), b2_grad_sum )
+    W1_grad_sum = tf.add(tf.multiply( W1_grad, r2go), W1_grad_sum )
+    W2_grad_sum = tf.add(tf.multiply( W2_grad, r2go), W2_grad_sum )
+    b1_grad_sum = tf.add(tf.multiply( b1_grad, r2go), b1_grad_sum )
+    b2_grad_sum = tf.add(tf.multiply( b2_grad, r2go), b2_grad_sum )
+
+
+    W1_grad_sum_val, W2_grad_sum_val, b1_grad_sum_val, b2_grad_sum_val = param_vals
+    return ( W1_grad_sum_val/N , W2_grad_sum_val/N , b1_grad_sum_val/N , b2_grad_sum_val/N ) 
+
+def run_grad(grads, rewards, trajectories):
 
     for i in range(len(trajectories)):  
         R    = rewards[i]
@@ -88,12 +95,7 @@ def compute_grad(params, rewards, trajectories, dims, sess):
                 obs_place: obs,
                 action_place: action
             }
-            param_vals = sess.run(
-                [W1_grad_sum, W2_grad_sum, b1_grad_sum, b2_grad_sum],
-                feed_dict = feed_dictionary)
-
-    W1_grad_sum_val, W2_grad_sum_val, b1_grad_sum_val, b2_grad_sum_val = param_vals
-    return ( W1_grad_sum_val/N , W2_grad_sum_val/N , b1_grad_sum_val/N , b2_grad_sum_val/N ) 
+            param_vals = sess.run(grads,feed_dict = feed_dictionary)
 
 def init_mlp(dims):
     obs_dim, hidden_units, action_dim = dims
@@ -111,7 +113,7 @@ def mlp(func_obs, params):
     layer_out = tf.nn.softmax(tf.add(tf.matmul(layer_1, W2), b2)) #Minor Change: Sam added the b2 here
     return layer_out
 
-def run(epochs = 5, learning_rate = .01, 
+def run(epochs = 20, learning_rate = .01, 
 		steps = 40, num_trajectories = 100, 
 		environment = 'CartPole-v0'):
     print("Creating environment...")
@@ -127,22 +129,22 @@ def run(epochs = 5, learning_rate = .01,
     layer_out = mlp(observation, params)
     print("\nStarting session...\n")
     with tf.Session() as sess:
-        # writer = tf.summary.FileWriter("./graphs", sess.graph)
+        W1_grad, W2_grad, b1_grad, b2_grad = compute_grad(params, rewards, trajectories, dims, sess)
+        W1 = tf.assign(W1, tf.add(W1, learning_rate * W1_grad))
+        W2 = tf.assign(W2, tf.add(W2, learning_rate * W2_grad))
+        b1 = tf.assign(b1, tf.add(b1, learning_rate * b1_grad))
+        b2 = tf.assign(b2, tf.add(b2, learning_rate * b2_grad))
+        params = W1, W2, b1, b2
         sess.run(tf.global_variables_initializer())
-        for i in tqdm(range(epochs)):
+        for i in range(epochs):
+            start = time.time()
             trajectories, rewards = explore(layer_out, env, steps, num_trajectories, sess)
-            W1_grad, W2_grad, b1_grad, b2_grad = compute_grad(params, rewards, trajectories, dims, sess)
-            W1 = tf.assign(W1, tf.add(W1, learning_rate * W1_grad))
-            W2 = tf.assign(W2, tf.add(W2, learning_rate * W2_grad))
-            b1 = tf.assign(b1, tf.add(b1, learning_rate * b1_grad))
-            b2 = tf.assign(b2, tf.add(b2, learning_rate * b2_grad))
-            params = W1, W2, b1, b2
+            print("Mean reward:", np.mean([len(traj) for traj in rewards]))
+            
             # print("Computing gradients...")
-            qwer = sess.run(params) 
-            W1_run, W2_run, b1_run, b2_run = qwer
+            _ = sess.run(params) 
             layer_out = mlp(observation, params)
-            print("Current b2:", b2_run)
-            print("Rewards is broken:", set([set(r)=={1.0} for r in rewards]))
+            print("Time:", time.time() - start)
         # writer = tf.summary.FileWriter("./graphs", sess.graph)
         print("\nDone!")
     return None
