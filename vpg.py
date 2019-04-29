@@ -59,13 +59,10 @@ def compute_grad(params, dims, num_trajectories, observation, policy):
         W2_grad_sum = tf.Variable(tf.zeros([hidden_units, action_dim], dtype = tf.float64), name = "b1_sum")
         b1_grad_sum = tf.Variable(tf.zeros([hidden_units],             dtype = tf.float64), name = "W2_sum")
         b2_grad_sum = tf.Variable(tf.zeros([action_dim],               dtype = tf.float64), name = "b2_sum")
-        
-        N = tf.constant(num_trajectories, name = num_trajectories)
+        N = tf.constant(num_trajectories, dtype = tf.float64, name = "num_trajectories")
         R_place      = tf.placeholder(tf.float64, name = "R_place")
         t_place      = tf.placeholder(tf.int32, name = "t_place")
         action_place = tf.placeholder(tf.int32, name = "action_place")
-
-    # return W1_grad_sum, W1_grad_sum, W2_grad_sum, b2_grad_sum
 
     W1_grad, W2_grad, b1_grad, b2_grad = grad_log_policy(
         params, action_place, observation, policy)
@@ -74,15 +71,22 @@ def compute_grad(params, dims, num_trajectories, observation, policy):
         r2go = tf.py_func(rtg, [R_place, t_place], tf.float64)
 
     with tf.name_scope('estimate_policy_grad') as scope:
-        W1_grad_sum = tf.add(tf.multiply(W1_grad, r2go), W1_grad_sum)
-        W2_grad_sum = tf.add(tf.multiply(W2_grad, r2go), W2_grad_sum)
-        b1_grad_sum = tf.add(tf.multiply(b1_grad, r2go), b1_grad_sum)
-        b2_grad_sum = tf.add(tf.multiply(b2_grad, r2go), b2_grad_sum)
+        W1_grad_sum = tf.assign(W1_grad_sum, tf.add(tf.multiply(W1_grad, r2go), W1_grad_sum))
+        W2_grad_sum = tf.assign(W2_grad_sum, tf.add(tf.multiply(W2_grad, r2go), W2_grad_sum))
+        b1_grad_sum = tf.assign(b1_grad_sum, tf.add(tf.multiply(b1_grad, r2go), b1_grad_sum))
+        b2_grad_sum = tf.assign(b2_grad_sum, tf.add(tf.multiply(b2_grad, r2go), b2_grad_sum))
         grad_sums = (W1_grad_sum / N, W2_grad_sum / N, b1_grad_sum / N, b2_grad_sum / N)
 
     return grad_sums
 
 def run_all(params, trajectories, rewards, sess):
+    # this code sucks, but idk how to do it better
+    W1_grad_sum = [var for var in tf.global_variables() if var.op.name == "grad_vars/W1_sum"][0]
+    W2_grad_sum = [var for var in tf.global_variables() if var.op.name == "grad_vars/W2_sum"][0]
+    b1_grad_sum = [var for var in tf.global_variables() if var.op.name == "grad_vars/b1_sum"][0]
+    b2_grad_sum = [var for var in tf.global_variables() if var.op.name == "grad_vars/b2_sum"][0]
+
+    sess.run(tf.variables_initializer([W1_grad_sum, W2_grad_sum, b1_grad_sum, b2_grad_sum]))
 
     for i in range(len(trajectories)):  
         R    = rewards[i]
@@ -107,7 +111,7 @@ def init_mlp(dims):
         W2 = tf.Variable(initializer([hidden_units, action_dim]), name = 'W2')
         b1 = tf.Variable(initializer([hidden_units]), name = 'b1')
         b2 = tf.Variable(initializer([action_dim]), name = 'b2')
-        params   = (W1, W2, b1, b2)
+        params = (W1, W2, b1, b2)
     return params
   
 def mlp(func_obs, params):
@@ -117,8 +121,8 @@ def mlp(func_obs, params):
         policy = tf.nn.softmax(tf.add(tf.matmul(layer_1, W2), b2))
     return policy
 
-def run(epochs = 10, learning_rate = .1, 
-		steps = 100, num_trajectories = 20, 
+def run(epochs = 100, learning_rate = .1, 
+		steps = 100, num_trajectories = 100, 
 		environment = 'CartPole-v0'):
 
     print("Creating environment...")
@@ -136,7 +140,6 @@ def run(epochs = 10, learning_rate = .1,
 
     print("\nStarting session...\n")
     with tf.Session() as sess:
-        print(tf.global_variables())
         lr = tf.constant(learning_rate, dtype = tf.float64, name = 'learning_rate')
         W1_grad, W2_grad, b1_grad, b2_grad = compute_grad(
             params, dims, num_trajectories, observation, policy
@@ -147,7 +150,6 @@ def run(epochs = 10, learning_rate = .1,
             b1 = tf.assign(b1, tf.add(b1, lr * b1_grad))
             b2 = tf.assign(b2, tf.add(b2, lr * b2_grad))
         params = W1, W2, b1, b2
-        print(tf.global_variables())
         sess.run(tf.global_variables_initializer())
 
         for i in range(epochs):
@@ -157,9 +159,8 @@ def run(epochs = 10, learning_rate = .1,
             print("Mean reward:", np.mean([len(traj) for traj in rewards]))
             # print("Time:", time.time() - start)
             # start = time.time()
-            print("Computing gradients...")
+            # print("Computing gradients...")
             param_vals = run_all(params, trajectories, rewards, sess)
-            print(param_vals)
             print("Time:", time.time() - start)
             print()
         writer = tf.summary.FileWriter("./graphs", sess.graph)
