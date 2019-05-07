@@ -3,80 +3,103 @@ import tensorflow as tf
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+import os
+import random
 
-def run(learning_rate = .1, batch_size = 20,
-    max_steps = 200, num_episodes = 100, 
-    environment = 'CartPole-v0'):
+# parameters
+environment = 'CartPole-v0'
+num_episodes = 200
+batch_size = 10
+hidden_units = 32
+learning_rate = .01
+gamma = .95
+max_steps = 300
+seed_num = 10
 
-    env          = gym.make(environment)
-    action_dim   = env.action_space.n
-    obs_dim      = len(env.observation_space.high)
-    hidden_units = 32
-    dims = (obs_dim, hidden_units, action_dim)  
+# ensure reproducibility (and make debugging possible)
+np.random.seed(seed_num)
+random.seed(seed_num)
+os.environ['PYTHONHASHSEED'] = str(seed_num)
+tf.random.set_seed(seed_num)
 
-    policy = tf.keras.Sequential([
-        tf.keras.layers.Dense(32, input_shape = (4,), activation = 'relu'),
-        tf.keras.layers.Dense(2, activation = 'softmax')
-        ])
+# set-up environment
+env          = gym.make(environment)
+action_dim   = env.action_space.n
+obs_dim      = len(env.observation_space.high)
+dims = (obs_dim, hidden_units, action_dim)  
 
-    optimizer = tf.keras.optimizers.Adam()
+policy = tf.keras.Sequential([
+    tf.keras.layers.Dense(hidden_units, input_shape = (4,), activation = 'relu'),
+    tf.keras.layers.Dense(2, activation = 'softmax')
+    ])
 
-    grad_buffer = policy.trainable_variables
-    for ix, grad in enumerate(grad_buffer):
-        grad_buffer[ix] = grad * 0
+optimizer = tf.keras.optimizers.Adam(lr = learning_rate)
 
-    rewards = []
+# create buffer so we can sum gradients
+grad_buffer = policy.trainable_variables
+for ix, grad in enumerate(grad_buffer):
+    grad_buffer[ix] = grad * 0
 
-    for ep_number in range(num_episodes):
-        ep_reward = 0
+rewards = []
 
-        obs = np.expand_dims(env.reset(), axis = 0)
-        
-        ep_buffer = []
+for ep_number in range(num_episodes):
+    
+    ep_reward = 0
+    obs = np.expand_dims(env.reset(), axis = 0)
+    
+    ep_buffer = []
 
-        for j in range(max_steps):
-            # env.render()
-            with tf.GradientTape() as tape:
-                action_probs = policy(obs)
-                action = int(np.random.uniform() >= action_probs.numpy()[0,1])
-                log = tf.math.log(action_probs[obs])
+    for j in range(max_steps):
+        # env.render()
+        with tf.GradientTape() as tape:
+            action_probs = policy(obs)
+            action = int(np.random.uniform() >= action_probs.numpy()[0,1])
 
-            grads = tape.gradient(log, policy.trainable_variables)
-            
-            obs, reward, done, info = env.step(action)
-            obs = np.expand_dims(obs, axis = 0)
+            log = tf.math.log(action_probs)
 
-            ep_buffer.append([reward, grads])
-            ep_reward += reward
+        grads = tape.gradient(log, policy.trainable_variables)
+        obs, reward, done, info = env.step(action)
+        obs = np.expand_dims(obs, axis = 0)
 
-            if done:
-                break
+        ep_buffer.append([reward, grads])
+        ep_reward += reward
 
-        rewards.append(ep_reward)
-        if ep_number % batch_size == 0:
-            print("Episode {} reward:".format(ep_number), ep_reward)
+        if done:
+            break
 
-        ep_buffer = np.array(ep_buffer)
+    ep_reward -= 10
+    rewards.append(ep_reward)
 
-        # compute rewards-to-go
-        # todo: include discounting (and advantage function too!)
-        rewards_to_go = np.zeros(ep_buffer.shape[0])
-        for t in range(ep_buffer.shape[0]):
-            rewards_to_go[t] = np.sum(ep_buffer[t:,0])
+    ep_buffer = np.array(ep_buffer)
 
-        for t, ep_info in enumerate(ep_buffer):
-            for ix, grad in enumerate(grad_buffer):
-                grad_buffer[ix] += (1 / batch_size) * ep_info[1][ix] * rewards_to_go[t]
+    # compute rewards-to-go
+    # todo: advantage function???
+    rewards_to_go = np.zeros(ep_buffer.shape[0])
+    for t in range(ep_buffer.shape[0]):
+        length = range(len(ep_buffer[t:,0]))
+        weights = np.array([gamma ** i for i in length])
+        rewards_to_go[t] = np.sum(np.multiply(ep_buffer[t:,0], weights))
 
-        if ep_number % batch_size == 0:
-            optimizer.apply_gradients(zip(grad_buffer, policy.trainable_variables))
-            for ix, grad in enumerate(grad_buffer):
-                grad_buffer[ix] = grad * 0
+    # add episode information to estimation of policy gradient
+    for t, ep_info in enumerate(ep_buffer):
+        for ix, grad in enumerate(grad_buffer):
+            grad_buffer[ix] += (1 / batch_size) * ep_info[1][ix] * rewards_to_go[t]
+
+    # every batch_size number of episodes, 
+    # run gradient descent on sample
+    if ep_number % batch_size == 0:
+
+        print("Episode {} reward:".format(ep_number), np.mean(rewards[-batch_size:]) + 10)
+
+        optimizer.apply_gradients(zip(grad_buffer, policy.trainable_variables))
+
+        # re-initialize buffer to zero (on-policy)
+        for ix, grad in enumerate(grad_buffer):
+            grad_buffer[ix] = grad * 0
 
 
-    plt.plot(rewards)
-    plt.show()
-    env.close()
-    return None
-
-run()
+plt.plot(rewards)
+plt.show(block=False)
+env.close()
+print("Done!")
+plt.show()
