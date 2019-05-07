@@ -34,7 +34,7 @@ def explore(policy, env, steps, num_trajectories, sess):
 
 def rtg(R, t):  #Rewards to go
     d = 1.0     # a discount factor 
-    R2Go = np.copy(np.array(R[t:]))
+    R2Go = np.copy(np.array(R_ph[t_ph:]))
     for i in range(len(R2Go)):
         R2Go[i] *= d**i
     rewards_to_go = np.sum(R2Go).astype(np.float64)
@@ -51,7 +51,7 @@ def grad_log_policy(params, action_place, observation, policy):
     return (W1_grad, W2_grad, b1_grad, b2_grad)
   
   
-def compute_grad(params, dims, num_trajectories, observation, policy):
+def compute_grad(params, dims, num_trajectories, obs_ph, policy):
     # print("Setting up gradient...")
     obs_dim, hidden_units, action_dim = dims
     with tf.name_scope('grad_vars') as scope:
@@ -60,21 +60,21 @@ def compute_grad(params, dims, num_trajectories, observation, policy):
         b1_grad_sum = tf.Variable(tf.zeros([hidden_units],             dtype = tf.float64), name = "W2_sum")
         b2_grad_sum = tf.Variable(tf.zeros([action_dim],               dtype = tf.float64), name = "b2_sum")
         N = tf.constant(num_trajectories, dtype = tf.float64, name = "num_trajectories")
-        R_place      = tf.placeholder(tf.float64, name = "R_place")
-        t_place      = tf.placeholder(tf.int32, name = "t_place")
-        action_place = tf.placeholder(tf.int32, name = "action_place")
+        reward_ph      = tf.placeholder(tf.float64, name = "reward_ph")
+        t_ph      = tf.placeholder(tf.int32, name = "t_ph")
+        action_ph = tf.placeholder(tf.int32, name = "action_ph")
 
     W1_grad, W2_grad, b1_grad, b2_grad = grad_log_policy(
-        params, action_place, observation, policy)
+        params, action_ph, obs_ph, policy)
 
     with tf.name_scope('rewards_to_go') as scope:
-        r2go = tf.py_func(rtg, [R_place, t_place], tf.float64)
+        rewards_to_go = tf.py_func(rtg, [reward_ph, t_ph], tf.float64)
 
     with tf.name_scope('estimate_policy_grad') as scope:
-        W1_grad_sum = tf.assign(W1_grad_sum, tf.add(tf.multiply(W1_grad, r2go), W1_grad_sum))
-        W2_grad_sum = tf.assign(W2_grad_sum, tf.add(tf.multiply(W2_grad, r2go), W2_grad_sum))
-        b1_grad_sum = tf.assign(b1_grad_sum, tf.add(tf.multiply(b1_grad, r2go), b1_grad_sum))
-        b2_grad_sum = tf.assign(b2_grad_sum, tf.add(tf.multiply(b2_grad, r2go), b2_grad_sum))
+        W1_grad_sum = tf.assign(W1_grad_sum, tf.add(tf.multiply(W1_grad, rewards_to_go), W1_grad_sum))
+        W2_grad_sum = tf.assign(W2_grad_sum, tf.add(tf.multiply(W2_grad, rewards_to_go), W2_grad_sum))
+        b1_grad_sum = tf.assign(b1_grad_sum, tf.add(tf.multiply(b1_grad, rewards_to_go), b1_grad_sum))
+        b2_grad_sum = tf.assign(b2_grad_sum, tf.add(tf.multiply(b2_grad, rewards_to_go), b2_grad_sum))
         grad_sums = (W1_grad_sum / N, W2_grad_sum / N, b1_grad_sum / N, b2_grad_sum / N)
 
     return grad_sums
@@ -100,7 +100,7 @@ def run_all(params, trajectories, rewards, sess):
                 "p_obs:0": obs,
                 "grad_vars/action_place:0": action
             }
-            param_vals = sess.run(params, feed_dict = feed_dictionary)
+            param_vals = sess.run([params], feed_dict = feed_dictionary)
     return param_vals
 
 def init_mlp(dims):
@@ -114,15 +114,15 @@ def init_mlp(dims):
         params = (W1, W2, b1, b2)
     return params
   
-def mlp(func_obs, params):
+def mlp(obs, params):
     W1, W2, b1, b2 = params
     with tf.name_scope('feed_forward') as scope:
-        layer_1  = tf.nn.relu(tf.add(tf.matmul(func_obs, W1), b1))
+        layer_1  = tf.nn.relu(tf.add(tf.matmul(obs, W1), b1))
         policy = tf.nn.softmax(tf.add(tf.matmul(layer_1, W2), b2))
     return policy
 
-def run(epochs = 100, learning_rate = .1, 
-		steps = 100, num_trajectories = 100, 
+def run(epochs = 5, learning_rate = .1, 
+		steps = 100, num_trajectories = 20, 
 		environment = 'CartPole-v0'):
 
     print("Creating environment...")
@@ -131,18 +131,18 @@ def run(epochs = 100, learning_rate = .1,
     obs_dim      = len(env.observation_space.high)
     hidden_units = 10
     dims = (obs_dim, hidden_units, action_dim)  
-    observation = tf.placeholder(tf.float64, [1, obs_dim], name = 'p_obs')
+    obs_ph = tf.placeholder(tf.float64, [1, obs_dim], name = 'p_obs')
 
     print("Creating network...")
     params = init_mlp(dims)
     W1, W2, b1, b2 = params
-    policy = mlp(observation, params)
+    policy = mlp(obs_ph, params)
 
     print("\nStarting session...\n")
     with tf.Session() as sess:
         lr = tf.constant(learning_rate, dtype = tf.float64, name = 'learning_rate')
         W1_grad, W2_grad, b1_grad, b2_grad = compute_grad(
-            params, dims, num_trajectories, observation, policy
+            params, dims, num_trajectories, obs_ph, policy
         )
         with tf.name_scope('update_weights') as scope:
             W1 = tf.assign(W1, tf.add(W1, lr * W1_grad))
