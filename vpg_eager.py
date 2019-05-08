@@ -8,11 +8,11 @@ import random
 
 # parameters
 environment = 'CartPole-v0'
-num_episodes = 200
-batch_size = 10
+num_episodes = 100
+batch_size = 5
 hidden_units = 32
 learning_rate = .01
-gamma = .95
+gamma = .8
 max_steps = 300
 seed_num = 10
 
@@ -55,7 +55,7 @@ for ep_number in range(num_episodes):
             action_probs = policy(obs)
             action = int(np.random.uniform() >= action_probs.numpy()[0,1])
 
-            log = tf.math.log(action_probs)
+            log = tf.math.log(action_probs[0, action])
 
         grads = tape.gradient(log, policy.trainable_variables)
         obs, reward, done, info = env.step(action)
@@ -76,20 +76,20 @@ for ep_number in range(num_episodes):
     # todo: advantage function???
     rewards_to_go = np.zeros(ep_buffer.shape[0])
     for t in range(ep_buffer.shape[0]):
-        length = range(len(ep_buffer[t:,0]))
-        weights = np.array([gamma ** i for i in length])
+        length = ep_buffer.shape[0] - t
+        weights = np.array([gamma ** i for i in range(length)])
         rewards_to_go[t] = np.sum(np.multiply(ep_buffer[t:,0], weights))
 
-    # add episode information to estimation of policy gradient
+    # add episode information to current estimation of policy gradient
     for t, ep_info in enumerate(ep_buffer):
-        for ix, grad in enumerate(grad_buffer):
-            grad_buffer[ix] += (1 / batch_size) * ep_info[1][ix] * rewards_to_go[t]
+        for ix, grad in enumerate(ep_info[1]):
+            grad_buffer[ix] -= (1 / batch_size) * grad * rewards_to_go[t]
 
     # every batch_size number of episodes, 
     # run gradient descent on sample
     if ep_number % batch_size == 0:
 
-        print("Episode {} reward:".format(ep_number), np.mean(rewards[-batch_size:]) + 10)
+        print("Episode {} reward:".format(ep_number), np.mean(rewards[-batch_size:]))
 
         optimizer.apply_gradients(zip(grad_buffer, policy.trainable_variables))
 
