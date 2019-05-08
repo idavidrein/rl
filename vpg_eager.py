@@ -8,7 +8,7 @@ import random
 
 # parameters
 environment = 'CartPole-v0'
-num_episodes = 100
+num_episodes = 1000
 batch_size = 5
 hidden_units = 32
 learning_rate = .01
@@ -53,7 +53,7 @@ for ep_number in range(num_episodes):
         # env.render()
         with tf.GradientTape() as tape:
             action_probs = policy(obs)
-            action = int(np.random.uniform() >= action_probs.numpy()[0,1])
+            action = int(np.random.uniform() <= action_probs.numpy()[0,1])
 
             log = tf.math.log(action_probs[0, action])
 
@@ -89,14 +89,14 @@ for ep_number in range(num_episodes):
     # run gradient descent on sample
     if ep_number % batch_size == 0:
 
-        print("Episode {} reward:".format(ep_number), np.mean(rewards[-batch_size:]))
-
         optimizer.apply_gradients(zip(grad_buffer, policy.trainable_variables))
 
         # re-initialize buffer to zero (on-policy)
         for ix, grad in enumerate(grad_buffer):
             grad_buffer[ix] = grad * 0
 
+    if ep_number % 10 == 0:
+        print("Episode {} reward:".format(ep_number), np.mean(rewards[-10:]))
 
 plt.plot(rewards)
 plt.show(block=False)
