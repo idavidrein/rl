@@ -67,7 +67,7 @@ for ep_number in range(num_episodes):
         if done:
             break
 
-    ep_reward -= 10
+    # ep_reward -= 10
     rewards.append(ep_reward)
 
     ep_buffer = np.array(ep_buffer)
