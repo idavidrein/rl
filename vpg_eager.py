@@ -8,7 +8,7 @@ import random
 
 # parameters
 environment = 'CartPole-v0'
-num_episodes = 1000
+num_episodes = 500
 batch_size = 5
 hidden_units = 32
 learning_rate = .01
@@ -23,14 +23,14 @@ os.environ['PYTHONHASHSEED'] = str(seed_num)
 tf.random.set_seed(seed_num)
 
 # set-up environment
-env          = gym.make(environment)
-action_dim   = env.action_space.n
-obs_dim      = len(env.observation_space.high)
-dims = (obs_dim, hidden_units, action_dim)  
+env = gym.make(environment)
+# action_dim = len(env.action_space.high)
+action_dim = env.action_space.n
+obs_dim = len(env.observation_space.high)
 
 policy = tf.keras.Sequential([
-    tf.keras.layers.Dense(hidden_units, input_shape = (4,), activation = 'relu'),
-    tf.keras.layers.Dense(2, activation = 'softmax')
+    tf.keras.layers.Dense(hidden_units, input_shape = (obs_dim,), activation = 'relu'),
+    tf.keras.layers.Dense(action_dim, activation = 'softmax')
     ])
 
 optimizer = tf.keras.optimizers.Adam(lr = learning_rate)
@@ -53,8 +53,8 @@ for ep_number in range(num_episodes):
         # env.render()
         with tf.GradientTape() as tape:
             action_probs = policy(obs)
-            action = int(np.random.uniform() <= action_probs.numpy()[0,1])
-
+            action = np.random.choice(action_probs.numpy()[0], p = action_probs.numpy()[0])
+            action = int(np.where(action_probs.numpy()[0] == action)[0])
             log = tf.math.log(action_probs[0, action])
 
         grads = tape.gradient(log, policy.trainable_variables)
@@ -67,7 +67,6 @@ for ep_number in range(num_episodes):
         if done:
             break
 
-    # ep_reward -= 10
     rewards.append(ep_reward)
 
     ep_buffer = np.array(ep_buffer)
