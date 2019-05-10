@@ -5,22 +5,111 @@ import time
 import matplotlib.pyplot as plt
 import os
 import random
+from tqdm import tqdm
+import utilities
+from gym.spaces import Box, Discrete
 
 def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.8, 
-    	seed_num=10, learning_rate=.01, num_episodes=400,
-    	batch_size=10, max_steps=1000):
-	
-	env = gym.make(environment)
+        seed_num=10, learning_rate=.01, num_episodes=400,
+        batch_size=10, max_steps=1000, num_layers = 1):
 
-	# to-do: only works for Discrete, fix for continuous!
-	action_dim = env.action_space.n
-	obs_dim = len(env.observation_space.high)
+    # ensure reproducibility (and make debugging possible)
+    np.random.seed(seed_num)
+    random.seed(seed_num)
+    os.environ['PYTHONHASHSEED'] = str(seed_num)
+    tf.random.set_seed(seed_num)
+    
+    env = gym.make(environment)
 
-	policy = tf.keras.Sequential([
-    	tf.keras.layers.Dense(hidden_units, input_shape = (obs_dim,), activation = 'relu'),
-    	tf.keras.layers.Dense(action_dim, activation = 'softmax')
-    ])
-	
+    if isinstance(env.action_space, Discrete):
+        action_dim = env.action_space.n
+    else:
+        action_dim = env.action_space.shape
+    if isinstance(env.observation_space, Discrete):
+        obs_dim = (1,)
+    elif isinstance(env.observation_space, gym.spaces.Tuple):
+        obs_dim = (len(env.observation_space),)
+    else:
+        obs_dim = env.observation_space.shape
+
+    # create policy network
+    # to-do: only works for Discrete, fix for continuous!
+    policy = tf.keras.Sequential()
+    policy.add(tf.keras.layers.Dense(hidden_units, input_shape = obs_dim, activation = 'relu'))
+    for i in range(num_layers - 1):
+        policy.add(tf.keras.layers.Dense(hidden_units, activation = 'relu'))
+    policy.add(tf.keras.layers.Dense(action_dim, activation = 'softmax'))
+    print()
+    policy.summary()
+    
+    optimizer = tf.keras.optimizers.Adam(lr = learning_rate)
+
+    # create buffer so we can sum gradients
+    grad_buffer = policy.trainable_variables
+    for ix, grad in enumerate(grad_buffer):
+        grad_buffer[ix] = grad * 0
+
+    rewards = []
+
+    print("\nRunning policy in environment and training...\n")
+
+    # main execution loop
+    for ep_number in tqdm(range(num_episodes)):
+        
+        ep_reward = 0
+        obs = np.array(env.reset()).reshape(1, -1)
+        
+        ep_buffer = []
+
+        for j in range(max_steps):
+            # env.render()
+            with tf.GradientTape() as tape:
+
+                # take action
+                # to-do: only works for Discrete, fix for continuous!
+                action_probs = policy(obs)
+                action = int(tf.random.categorical(action_probs, 1))
+                log = tf.math.log(action_probs[0, action])
+
+            # # take gradient w.r.t. params of log of action taken
+            grads = tape.gradient(log, policy.trainable_variables)
+            obs, reward, done, info = env.step(action)
+            obs = np.array(obs).reshape(1, -1)
+
+            # record info in buffer
+            ep_buffer.append([reward, grads])
+            ep_reward += reward
+
+            if done:
+                break
+
+        rewards.append(ep_reward)
+
+        ep_buffer = np.array(ep_buffer)
+
+        # compute rewards-to-go
+        # to-do: advantage function???
+        rewards_to_go = np.zeros(ep_buffer.shape[0])
+        for t in range(ep_buffer.shape[0]):
+            length = ep_buffer.shape[0] - t
+            weights = np.array([gamma ** i for i in range(length)])
+            rewards_to_go[t] = np.sum(np.multiply(ep_buffer[t:,0], weights))
+
+        # add episode information to current estimation of policy gradient
+        for t, ep_info in enumerate(ep_buffer):
+            for ix, grad in enumerate(ep_info[1]):
+                grad_buffer[ix] -= (1 / batch_size) * grad * rewards_to_go[t]
+
+        # every batch_size number of episodes, 
+        # run gradient descent on sample
+        if ep_number % batch_size == 0:
+
+            optimizer.apply_gradients(zip(grad_buffer, policy.trainable_variables))
+
+            # re-initialize buffer to zero (on-policy)
+            for ix, grad in enumerate(grad_buffer):
+                grad_buffer[ix] = grad * 0
+
 
 
 if __name__ == '__main__':
@@ -29,12 +118,11 @@ if __name__ == '__main__':
     parser.add_argument('--env', type=str, default='CartPole-v0')
     parser.add_argument('--hid', type=int, default=32)
     # use for # of hidden layers
-    # to-do: implement loop of hidden layers (easy)
-    parser.add_argument('--l', type=int, default=2)
+    parser.add_argument('--l', type=int, default=1)
     parser.add_argument('--lr', type=float, default=.01)
     parser.add_argument('--gamma', type=float, default=0.8)
-    parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--batch', type=int, default=5)
+    parser.add_argument('--seed', '-s', type=int, default=10)
+    parser.add_argument('--batch', type=int, default=10)
     parser.add_argument('--eps', type=int, default=50)
     # use for logging
     # to-do: implement good logging procedure; can take inspiration from openai (medium)
@@ -42,5 +130,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     vpg(environment=args.env, hidden_units=args.hid, gamma=args.gamma, 
-    	seed_num=args.seed, learning_rate=args.lr, num_episodes=args.eps,
-    	batch_size=args.batch)
+        seed_num=args.seed, learning_rate=args.lr, num_episodes=args.eps,
+        batch_size=args.batch, num_layers=args.l)
