@@ -8,8 +8,8 @@ import random
 
 # parameters
 environment = 'CartPole-v0'
-num_episodes = 500
-batch_size = 5
+num_episodes = 2
+batch_size = 1
 hidden_units = 32
 learning_rate = .01
 gamma = .8
@@ -58,6 +58,7 @@ for ep_number in range(num_episodes):
             log = tf.math.log(action_probs[0, action])
 
         grads = tape.gradient(log, policy.trainable_variables)
+        print(grads[3])
         obs, reward, done, info = env.step(action)
         obs = np.expand_dims(obs, axis = 0)
 
@@ -94,8 +95,8 @@ for ep_number in range(num_episodes):
         for ix, grad in enumerate(grad_buffer):
             grad_buffer[ix] = grad * 0
 
-    if ep_number % 10 == 0:
-        print("Episode {} reward:".format(ep_number), np.mean(rewards[-10:]))
+    if ep_number % 5 == 0:
+        print("Episode {} reward:".format(ep_number), np.mean(rewards[-5:]))
 
 plt.plot(rewards)
 plt.show(block=False)

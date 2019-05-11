@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import os
 import random
 from tqdm import tqdm
-import utilities
 from gym.spaces import Box, Discrete
+from utils import discrete_network
 
 def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.8, 
         seed_num=10, learning_rate=.01, num_episodes=400,
@@ -28,17 +28,13 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.8,
     if isinstance(env.observation_space, Discrete):
         obs_dim = (1,)
     elif isinstance(env.observation_space, gym.spaces.Tuple):
-        obs_dim = (len(env.observation_space),)
+        obs_dim = len(env.observation_space)
     else:
         obs_dim = env.observation_space.shape
 
     # create policy network
     # to-do: only works for Discrete, fix for continuous!
-    policy = tf.keras.Sequential()
-    policy.add(tf.keras.layers.Dense(hidden_units, input_shape = obs_dim, activation = 'relu'))
-    for i in range(num_layers - 1):
-        policy.add(tf.keras.layers.Dense(hidden_units, activation = 'relu'))
-    policy.add(tf.keras.layers.Dense(action_dim, activation = 'softmax'))
+    policy = discrete_network(dims = (obs_dim, action_dim))
     print()
     policy.summary()
     
@@ -54,7 +50,7 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.8,
     print("\nRunning policy in environment and training...\n")
 
     # main execution loop
-    for ep_number in tqdm(range(num_episodes)):
+    for ep_number in range(num_episodes):
         
         ep_reward = 0
         obs = np.array(env.reset()).reshape(1, -1)
@@ -68,10 +64,11 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.8,
                 # take action
                 # to-do: only works for Discrete, fix for continuous!
                 action_probs = policy(obs)
-                action = int(tf.random.categorical(action_probs, 1))
-                log = tf.math.log(action_probs[0, action])
+                log_probs = tf.math.log(action_probs)
+                action = int(tf.random.categorical(log_probs, 1))
+                log = log_probs[0, action]
 
-            # # take gradient w.r.t. params of log of action taken
+            # take gradient w.r.t. params of log of action taken
             grads = tape.gradient(log, policy.trainable_variables)
             obs, reward, done, info = env.step(action)
             obs = np.array(obs).reshape(1, -1)
@@ -103,6 +100,7 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.8,
         # every batch_size number of episodes, 
         # run gradient descent on sample
         if ep_number % batch_size == 0:
+            print("{0} reward: {1}".format(ep_number, np.mean(rewards[-batch_size:])))
 
             optimizer.apply_gradients(zip(grad_buffer, policy.trainable_variables))
 
