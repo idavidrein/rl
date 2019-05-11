@@ -6,8 +6,7 @@ import matplotlib.pyplot as plt
 import os
 import random
 from tqdm import tqdm
-from gym.spaces import Box, Discrete
-from utils import discrete_network
+from utils import discrete_network, get_dims
 
 def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.8, 
         seed_num=10, learning_rate=.01, num_episodes=400,
@@ -21,16 +20,7 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.8,
     
     env = gym.make(environment)
 
-    if isinstance(env.action_space, Discrete):
-        action_dim = env.action_space.n
-    else:
-        action_dim = env.action_space.shape
-    if isinstance(env.observation_space, Discrete):
-        obs_dim = (1,)
-    elif isinstance(env.observation_space, gym.spaces.Tuple):
-        obs_dim = len(env.observation_space)
-    else:
-        obs_dim = env.observation_space.shape
+    obs_dim, action_dim = get_dims(env.action_space, env.observation_space)
 
     # create policy network
     # to-do: only works for Discrete, fix for continuous!
@@ -100,7 +90,7 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.8,
         # every batch_size number of episodes, 
         # run gradient descent on sample
         if ep_number % batch_size == 0:
-            print("{0} reward: {1}".format(ep_number, np.mean(rewards[-batch_size:])))
+            print("Episode {0} reward: {1}".format(ep_number, np.mean(rewards[-batch_size:])))
 
             optimizer.apply_gradients(zip(grad_buffer, policy.trainable_variables))
 
