@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import os
 import random
 from tqdm import tqdm
-from utils import discrete_network, get_dims
+from utils import *
+from gym.spaces import Discrete, Box
 
 def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.8, 
         seed_num=10, learning_rate=.01, num_episodes=400,
@@ -24,9 +25,10 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.8,
 
     # create policy network
     # to-do: only works for Discrete, fix for continuous!
-    policy = discrete_network(dims = (obs_dim, action_dim))
-    print()
-    policy.summary()
+    if isinstance(env.action_space, Discrete):
+        policy = discrete_network(dims = (obs_dim, action_dim))
+    else:
+        policy = continuous_network(dims = (obs_dim, action_dim))
     
     optimizer = tf.keras.optimizers.Adam(lr = learning_rate)
 
@@ -48,15 +50,17 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.8,
         ep_buffer = []
 
         for j in range(max_steps):
-            # env.render()
             with tf.GradientTape() as tape:
 
                 # take action
                 # to-do: only works for Discrete, fix for continuous!
-                action_probs = policy(obs)
-                log_probs = tf.math.log(action_probs)
-                action = int(tf.random.categorical(log_probs, 1))
-                log = log_probs[0, action]
+                if isinstance(env.action_space, Discrete):
+                    action_probs = policy(obs)
+                    log_probs = tf.math.log(action_probs)
+                    action = int(tf.random.categorical(log_probs, 1))
+                    log = log_probs[0, action]
+                else:
+                    action, log = policy(obs)
 
             # take gradient w.r.t. params of log of action taken
             grads = tape.gradient(log, policy.trainable_variables)
@@ -108,7 +112,7 @@ if __name__ == '__main__':
     # use for # of hidden layers
     parser.add_argument('--l', type=int, default=1)
     parser.add_argument('--lr', type=float, default=.01)
-    parser.add_argument('--gamma', type=float, default=0.8)
+    parser.add_argument('--gamma', type=float, default=0.9)
     parser.add_argument('--seed', '-s', type=int, default=10)
     parser.add_argument('--batch', type=int, default=10)
     parser.add_argument('--eps', type=int, default=50)
