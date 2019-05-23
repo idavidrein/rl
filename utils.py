@@ -4,44 +4,63 @@ from tensorflow.keras.models import Model
 import numpy as np
 from gym.spaces import Box, Discrete
 import gym
+import json
 
-def discrete_network(dims = None):
+def discrete_network(dims = None, output_activation = 'softmax'):
     x = Input(shape = dims[0], name = "input")
-    hidden = Dense(32, activation = 'relu', name = 'hidden')(x)
-    output = Dense(dims[1], activation = 'softmax', name = 'output')(hidden)
-    policy = Model(inputs = x, outputs = output)
-    return policy
+    hidden = Dense(8, activation = 'relu', name = 'hidden_1')(x)
+    output = Dense(dims[1], activation = output_activation, name = 'output')(hidden)
+    model = Model(inputs = x, outputs = output)
+    return model
 
 def continuous_network(dims = None):
     x = Input(shape = dims[0], name = "input")
     hidden = Dense(32, activation = 'relu', name = 'hidden')(x)
     means = Dense(dims[1], name = 'means')(hidden)
-    action, likelihood = sampling(dims[1])(means)
-    policy = Model(inputs = x, outputs = [action, likelihood])
+    action, likelihood = sampling()(means)
+    model = Model(inputs = x, outputs = [action, likelihood])
     
-    return policy
+    return model
 
 class sampling(tf.keras.layers.Layer):
-    def __init__(self, num_outputs):
+    def __init__(self):
         super(sampling, self).__init__()
-        self.num_outputs = num_outputs
 
     def build(self, input_shape):
         self.kernel = self.add_variable("kernel", 
-            shape=[int(input_shape[-1]), self.num_outputs],
+            shape=[input_shape[-1]],
             initializer=tf.initializers.ones(), dtype = tf.float32)
 
     def call(self, input):
         exp = tf.exp(self.kernel)
-        action = input + tf.random.normal([input.shape[1]]) * exp
+        action = input + tf.random.normal([int(input.shape[-1])]) * exp
         likelihood = log_likelihood(action, input, self.kernel)
         return action, likelihood
 
-
-
 def log_likelihood(x, mu, log_std):
-	likelihood = -0.5*(((x-mu)/(tf.exp(log_std)+1e-8))**2 + 2*log_std + np.log(2*np.pi))
-	return likelihood
+    likelihood = -0.5*(((x-mu)/(tf.exp(log_std)+1e-8))**2 + 2*log_std + np.log(2*np.pi))
+    return likelihood
+
+class Logger():
+    def __init__(self, file_name, info):
+        self.fpath = 'logs/' + file_name
+        self.output_file = open(self.fpath, 'w')
+        self.info = info
+
+        with open(self.fpath + '_info.json', 'w') as info_file:
+            json.dump(self.info, info_file, indent=4)
+
+    def log_epoch(self, **kwargs):          
+        return
+
+def summary_stats(info):
+    summaries = dict()
+    summaries['sum'] = info.sum()
+    summaries['mean'] = np.mean(info)
+    summaries['min'] = info.min()
+    summaries['max'] = info.max()
+    summaries['variance'] = np.var(info)
+    return summaries
 
 def get_dims(act_space, obs_space):
 
