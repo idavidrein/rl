@@ -1,4 +1,4 @@
-#Reinforcement Learning (RL)
+# Reinforcement Learning (RL)
 Implementations of common Reinforcement Learning Algorithms in Tensorflow 2.0. Uses the OpenAI Gym environment for algorithm testing.
 
 ## Algorithms Implemented
