@@ -8,7 +8,7 @@ import json
 
 def discrete_network(dims = None, output_activation = 'softmax'):
     x = Input(shape = dims[0], name = "input")
-    hidden = Dense(8, activation = 'relu', name = 'hidden_1')(x)
+    hidden = Dense(4, activation = 'relu', name = 'hidden_1')(x)
     output = Dense(dims[1], activation = output_activation, name = 'output')(hidden)
     model = Model(inputs = x, outputs = output)
     return model
@@ -19,7 +19,6 @@ def continuous_network(dims = None):
     means = Dense(dims[1], name = 'means')(hidden)
     action, likelihood = sampling()(means)
     model = Model(inputs = x, outputs = [action, likelihood])
-    
     return model
 
 class sampling(tf.keras.layers.Layer):
@@ -40,6 +39,11 @@ class sampling(tf.keras.layers.Layer):
 def log_likelihood(x, mu, log_std):
     likelihood = -0.5*(((x-mu)/(tf.exp(log_std)+1e-8))**2 + 2*log_std + np.log(2*np.pi))
     return likelihood
+
+def save_models(models, filepaths):
+    assert(len(models) == len(filepaths))
+    for ix in range(len(models)):
+        models[ix].save(filepaths[ix])
 
 class Logger():
     def __init__(self, file_name, info):

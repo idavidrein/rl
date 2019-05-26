@@ -3,10 +3,11 @@
     "hid": 32,
     "l": 1,
     "lr": 0.01,
-    "gamma": 0.9,
+    "gamma": 0.99,
     "seed": 10,
-    "batch": 5,
-    "eps": 800,
-    "lam": 0.9,
+    "batch": 20,
+    "eps": 10000,
+    "lam": 0.95,
+    "save": "CartPole",
     "exp_name": "log1"
 }

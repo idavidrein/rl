@@ -9,13 +9,15 @@ MAX_STEPS = 1000
 ENVIRONMENT = "CartPole-v0"
 
 env = gym.make(ENVIRONMENT)
-policy = load_model("models/policy")
+policy = load_model("models/CartPole_policy")
 
 while True:
 
     obs = np.array(env.reset()).reshape(1, -1)
+    num_steps = 0
 
     for i in range(MAX_STEPS):
+        num_steps += 1
         env.render()
         if isinstance(env.action_space, Discrete):
             action_probs = policy(obs)
@@ -30,3 +32,5 @@ while True:
 
         if done:
             break
+
+    print(num_steps, end='\r')
