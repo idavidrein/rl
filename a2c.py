@@ -10,7 +10,7 @@ from utils import *
 from gym.spaces import Discrete, Box
 import atexit
 
-def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9, 
+def a2c(environment='CartPole-v0', hidden_units=32, gamma=0.9, 
         seed_num=10, learning_rate=.01, num_episodes=400,
         batch_size=10, max_steps=1000, num_layers = 1, 
         fpath="logs/log", arg_dict=dict(), lam=.9, save=''):
@@ -18,6 +18,7 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
     logger = Logger(file_name = fpath, info = arg_dict)
     save_path = "models/" + save
     policy_path = save_path + "_policy"
+    critic_path = save_path + "_critic"
 
     # ensure reproducibility (and make debugging possible)
     np.random.seed(seed_num)
@@ -36,6 +37,12 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
         policy = continuous_network(dims = (obs_dim, action_dim))
 
     optimizer = tf.keras.optimizers.Adam(lr = learning_rate)
+
+    # create value network (critic)
+    critic = discrete_network(dims = (obs_dim, 1), output_activation = None)
+    critic.compile(optimizer = 'adam', loss = 'mean_squared_error')
+    critic_buffer = []
+    val_loss = []
     
     # create buffer so we can aggregate gradients
     grad_buffer = policy.trainable_variables
@@ -48,6 +55,8 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
 
     # main execution loop
     for ep_number in range(num_episodes):
+
+        critic_buffer.append([])
         
         ep_reward = 0
         obs = np.array(env.reset()).reshape(1, -1)
@@ -59,6 +68,7 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
             with tf.GradientTape() as tape:
 
                 # run policy on observation
+                # print(obs.shape)
                 if isinstance(env.action_space, Discrete):
                     action_probs = policy(obs)
                     log_probs = tf.math.log(action_probs)
@@ -78,6 +88,9 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
             ep_buffer.append([reward, grads])
             ep_reward += reward
 
+            # fill critic info buffer
+            critic_buffer[-1].append(prev_obs)
+
             if done:
                 break
 
@@ -85,9 +98,15 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
 
         ep_buffer = np.array(ep_buffer)
 
-        # compute discounted rewards-to-go
+        critic_buffer[-1] = np.reshape(critic_buffer[-1], (-1, obs_dim[0]))
+
+        # compute discounted rewards-to-go and advantage function
+        # uses Generalized Advantage Estimation (GAE)
+        # to-do: modularize into own function
         num_steps = ep_buffer.shape[0]
         rewards_to_go = np.zeros(num_steps)
+        advantages = np.zeros(num_steps)
+        val_estimates = critic(critic_buffer[-1])
         for t in range(num_steps):
             length = num_steps - t
             weights = np.ones(length) * gamma
@@ -95,6 +114,22 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
             weights = np.power(weights, range(length))
             # calculate rewards-to-to
             rewards_to_go[t] = np.sum(np.multiply(weights, ep_buffer[t:,0]))
+            weights = weights * lam
+            for l in range(length):
+                # if-else is necessary to avoid buffer overflow
+                if l < length - 1:
+                    # calculate TD-Residual
+                    delta = ep_buffer[t+l, 0]+lam*val_estimates[t+l+1]-val_estimates[t+l]
+                    advantages[t] += weights[l] * delta
+                else:
+                    # end of trajectory, so V(s_(t+1)) = 0
+                    delta = ep_buffer[t + l, 0] - val_estimates[t + l]
+                    advantages[t] += weights[l] * delta
+
+        # attach rewards to critic buffer
+        critic_buffer[-1] = np.concatenate(
+            (critic_buffer[-1], np.expand_dims(rewards_to_go, axis = 1)), 
+            axis = 1)
 
         # add episode information to current estimation of policy gradient
         for t, ep_info in enumerate(ep_buffer):
@@ -102,7 +137,7 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
 
                 # subtract because optimizer minimizes loss function, 
                 # and we want to maximize expected reward
-                grad_buffer[ix] -= (1 / batch_size) * grad * rewards_to_go[t]
+                grad_buffer[ix] -= (1 / batch_size) * grad * advantages[t]
 
         # every batch_size number of episodes, 
         # run gradient descent on samples
@@ -117,10 +152,26 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
             for ix, grad in enumerate(grad_buffer):
                 grad_buffer[ix] = grad * 0
 
-            print("Epoch {0} reward: {1}".format(
-                ep_number / batch_size, 
-                np.mean(rewards[-batch_size:])))
+            # value function optimization
+            critic_buffer_arr = np.concatenate(critic_buffer)
+            history = critic.fit(
+                x = critic_buffer_arr[:, :-1], 
+                y = critic_buffer_arr[:, -1],
+                batch_size = critic_buffer_arr.shape[0],
+                verbose = 0)
 
+            print("Epoch {0} reward: {1}, value loss: {2}".format(
+                ep_number / batch_size, 
+                np.mean(rewards[-batch_size:]), 
+                history.history['loss'][0] / critic_buffer_arr.shape[0]))
+
+            # to-do: give Logger class dictionary to keep track
+            # of stuff like this. Goal: logger.logs['loss'] = history.history['loss'][0]
+            # then log it in csv or json or something good with:
+            # logger.log('loss')
+            val_loss.append(history.history['loss'][0])
+            critic_buffer = []
+        
         # if ctrl+c is used to stop training, the models will be saved
         if save:
             atexit.register(save_models, [policy], [policy_path])

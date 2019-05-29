@@ -15,7 +15,7 @@ def discrete_network(dims = None, output_activation = 'softmax'):
 
 def continuous_network(dims = None):
     x = Input(shape = dims[0], name = "input")
-    hidden = Dense(32, activation = 'relu', name = 'hidden')(x)
+    hidden = Dense(4, activation = 'relu', name = 'hidden')(x)
     means = Dense(dims[1], name = 'means')(hidden)
     action, likelihood = sampling()(means)
     model = Model(inputs = x, outputs = [action, likelihood])

@@ -1,13 +1,13 @@
 {
-    "env": "CartPole-v0",
+    "env": "Pendulum-v0",
     "hid": 32,
     "l": 1,
     "lr": 0.01,
     "gamma": 0.99,
     "seed": 10,
-    "batch": 20,
-    "eps": 10000,
+    "batch": 1,
+    "eps": 500,
     "lam": 0.95,
-    "save": "CartPole",
+    "save": "",
     "exp_name": "log1"
 }
