@@ -40,6 +40,9 @@ def log_likelihood(x, mu, log_std):
     likelihood = -0.5*(((x-mu)/(tf.exp(log_std)+1e-8))**2 + 2*log_std + np.log(2*np.pi))
     return likelihood
 
+def kl(P, Q):
+    return -np.sum(P * np.log(Q / P))
+
 def save_models(models, filepaths):
     assert(len(models) == len(filepaths))
     for ix in range(len(models)):
@@ -65,6 +68,13 @@ def summary_stats(info):
     summaries['max'] = info.max()
     summaries['variance'] = np.var(info)
     return summaries
+
+def create_policy(action_space, obs_dim, action_dim):
+    if isinstance(action_space, Discrete):
+        policy = discrete_network(dims = (obs_dim, action_dim))
+    else:
+        policy = continuous_network(dims = (obs_dim, action_dim))
+    return policy
 
 def get_dims(act_space, obs_space):
 

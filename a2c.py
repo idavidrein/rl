@@ -31,10 +31,7 @@ def a2c(environment='CartPole-v0', hidden_units=32, gamma=0.9,
     obs_dim, action_dim = get_dims(env.action_space, env.observation_space)
 
     # create policy network (actor)
-    if isinstance(env.action_space, Discrete):
-        policy = discrete_network(dims = (obs_dim, action_dim))
-    else:
-        policy = continuous_network(dims = (obs_dim, action_dim))
+    policy = create_policy(env.action_space, obs_dim, action_dim)
 
     optimizer = tf.keras.optimizers.Adam(lr = learning_rate)
 
@@ -203,7 +200,7 @@ if __name__ == '__main__':
     parser.add_argument('--exp_name', type=str, default='log1')
     args = parser.parse_args()
 
-    vpg(environment=args.env, hidden_units=args.hid, gamma=args.gamma, 
+    a2c(environment=args.env, hidden_units=args.hid, gamma=args.gamma, 
         seed_num=args.seed, learning_rate=args.lr, num_episodes=args.eps,
         batch_size=args.batch, num_layers=args.l, fpath=args.exp_name,
         arg_dict = vars(args), lam=args.lam, save=args.save)

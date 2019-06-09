@@ -30,10 +30,7 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
     obs_dim, action_dim = get_dims(env.action_space, env.observation_space)
 
     # create policy network (actor)
-    if isinstance(env.action_space, Discrete):
-        policy = discrete_network(dims = (obs_dim, action_dim))
-    else:
-        policy = continuous_network(dims = (obs_dim, action_dim))
+    policy = create_policy(env.action_space, obs_dim, action_dim)
 
     optimizer = tf.keras.optimizers.Adam(lr = learning_rate)
     
