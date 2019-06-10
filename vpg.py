@@ -30,6 +30,7 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
     obs_dim, action_dim = get_dims(env.action_space, env.observation_space)
 
     # create policy network (actor)
+    # TODO: check policy to ensure it's created properly
     policy = create_policy(env.action_space, obs_dim, action_dim)
 
     optimizer = tf.keras.optimizers.Adam(lr=learning_rate)
@@ -59,6 +60,7 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
                 if isinstance(env.action_space, Discrete):
                     action_probs = policy(obs)
                     log_probs = tf.math.log(action_probs)
+                    # TODO: check actions are chosen properly
                     action = int(tf.random.categorical(log_probs, 1))
                     log = log_probs[0, action]
                 else:
@@ -81,6 +83,7 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
         ep_buffer = np.array(ep_buffer)
 
         # compute discounted rewards-to-go
+        # TODO: check rewards-to-go to ensure they're calculated correctly
         num_steps = ep_buffer.shape[0]
         rewards_to_go = np.zeros(num_steps)
         for t in range(num_steps):
@@ -119,7 +122,7 @@ def vpg(environment='CartPole-v0', hidden_units=32, gamma=0.9,
         if save:
             atexit.register(save_models, [policy], [policy_path])
     if save:
-        # to-do: figure out issue with the saved model not being compiled
+        # TODO: figure out issue with the saved model not being compiled
         # even though it should be >:( and implement functionality to 
         # save the model every so often and be able to resume training
         # given just a saved model
