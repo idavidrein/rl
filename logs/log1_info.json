@@ -5,9 +5,9 @@
     "lr": 0.0003,
     "gamma": 0.99,
     "seed": 10,
-    "batch": 100,
-    "eps": 2000,
+    "batch": 50,
+    "eps": 1000,
     "lam": 0.97,
-    "save": "",
+    "save": "cartpole_ppo2",
     "exp_name": "log1"
 }
