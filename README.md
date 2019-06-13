@@ -3,6 +3,8 @@ Implementations of common Reinforcement Learning Algorithms in Tensorflow 2.0. U
 
 ## Algorithms Implemented
 
-* Vanilla Policy Gradient: Similar to the REINFORCE algorithm, with on-policy Monte Carlo sampling. Uses Adam for optimization. 
+* Vanilla Policy Gradient (VPG): Similar to the REINFORCE algorithm, with on-policy Monte Carlo sampling. Uses Adam for optimization. 
 
-* A2C: Modification of VPG where a value function is learned to estimate discounted rewards, and Generalized Advantage Estimation is used to estimate the advantage function. Policy updates are biased, but with lower variance than with VPG.
+* Advantage Actor-Critic (A2C): Modification of VPG where a value function is learned to estimate discounted rewards, and Generalized Advantage Estimation is used to estimate the advantage function. Policy updates are biased, but with lower variance than with VPG.
+
+* Proximal Policy Optimization (PPO-Clip): An A2C algorithm in which a clipped surrogate objective function is used to discourage large (and likely harmful) policy updates.
